@@ -39,6 +39,8 @@ function CursorGlitter() {
 
 function FloatingComponent({ position, type, index, delay, progressRef, isLogo }: { position: [number, number, number], type: string, index: number, delay: number, progressRef?: React.MutableRefObject<{value: number}>, isLogo?: boolean }) {
   const meshRef = useRef<THREE.Group>(null);
+  const materialRef1 = useRef<THREE.MeshStandardMaterial>(null);
+  const materialRef2 = useRef<THREE.MeshStandardMaterial>(null);
   
   useFrame((state) => {
     if (!meshRef.current) return;
@@ -46,19 +48,28 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
     const progress = progressRef ? progressRef.current.value : 0;
     
     // Lerp wobble magnitude based on progress
-    const baseWobbleY = isLogo ? 0 : 0.05;
-    const baseRotX = isLogo ? 0 : Math.sin(t / 2 + index) * 0.1;
-    const baseRotZ = isLogo ? 0 : Math.cos(t / 2 + index) * 0.1;
+    const baseWobbleY = 0;
+    const baseRotX = 0;
+    const baseRotZ = 0;
 
-    const wobbleY = THREE.MathUtils.lerp(0.5, baseWobbleY, progress);
-    const wobbleX = THREE.MathUtils.lerp(0.5, 0, progress);
+    const easeProgress = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+    const wobbleY = THREE.MathUtils.lerp(0.5, baseWobbleY, easeProgress);
+    const wobbleX = THREE.MathUtils.lerp(0.5, 0, easeProgress);
 
     meshRef.current.position.y = Math.sin(t * 2 + index) * wobbleY;
     meshRef.current.position.x = Math.cos(t * 1.5 + index) * wobbleX;
     
-    meshRef.current.rotation.x = THREE.MathUtils.lerp(t * 0.5 + index, baseRotX, progress);
-    meshRef.current.rotation.y = THREE.MathUtils.lerp(t * 0.8 + index, 0, progress);
-    meshRef.current.rotation.z = THREE.MathUtils.lerp(t * 0.6 + index, baseRotZ, progress);
+    meshRef.current.rotation.x = THREE.MathUtils.lerp(t * 0.5 + index, baseRotX, easeProgress);
+    meshRef.current.rotation.y = THREE.MathUtils.lerp(t * 0.8 + index, 0, easeProgress);
+    meshRef.current.rotation.z = THREE.MathUtils.lerp(t * 0.6 + index, baseRotZ, easeProgress);
+
+    if (materialRef1.current) {
+        materialRef1.current.emissiveIntensity = THREE.MathUtils.lerp(0.1, emissiveFactor, Math.pow(progress, 4));
+    }
+    if (materialRef2.current) {
+        materialRef2.current.emissiveIntensity = THREE.MathUtils.lerp(0.05, emissiveFactor * 0.8, Math.pow(progress, 4));
+    }
   });
 
   const ledColor = isLogo ? "#a3e635" : (index % 2 === 0 ? "#4ade80" : "#60a5fa");
@@ -125,11 +136,11 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
         <group>
           <mesh position={[0, 0.4, 0]}>
             <sphereGeometry args={[0.18, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
-            <meshStandardMaterial color={ledColor} emissive={ledEmissive} emissiveIntensity={emissiveFactor} transparent opacity={0.9} roughness={0.1} />
+            <meshStandardMaterial ref={materialRef1} color={ledColor} emissive={ledEmissive} emissiveIntensity={0.1} transparent opacity={0.9} roughness={0.1} />
           </mesh>
           <mesh position={[0, 0.2, 0]}>
             <cylinderGeometry args={[0.18, 0.18, 0.4, 16]} />
-            <meshStandardMaterial color={ledColor} emissive={ledEmissive} emissiveIntensity={emissiveFactor * 0.8} transparent opacity={0.8} roughness={0.1} />
+            <meshStandardMaterial ref={materialRef2} color={ledColor} emissive={ledEmissive} emissiveIntensity={0.05} transparent opacity={0.8} roughness={0.1} />
           </mesh>
           <mesh position={[0, -0.02, 0]}>
             <cylinderGeometry args={[0.2, 0.2, 0.05, 16]} />
@@ -162,7 +173,7 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
 
 function Breadboard() {
   return (
-    <group position={[0, -0.3, 0]}>
+    <group position={[0, 0, 0]}>
        {/* Main body */}
        <mesh>
          <boxGeometry args={[22, 0.5, 7]} />
@@ -221,8 +232,8 @@ function BreadboardWires({ logoPoints }: { logoPoints: any[] }) {
         else color = colorDecider > 0.6 ? '#f59e0b' : (colorDecider > 0.3 ? '#10b981' : '#a855f7');
         
         result.push({
-           start: new THREE.Vector3(p1[0], 0.2, p1[1]),
-           end: new THREE.Vector3(p2[0], 0.2, p2[1]),
+           start: new THREE.Vector3(p1[0], 0.26, p1[1]),
+           end: new THREE.Vector3(p2[0], 0.26, p2[1]),
            mid: new THREE.Vector3((p1[0]+p2[0])/2, 0.5 + dist * 0.2, (p1[1]+p2[1])/2),
            color
         });
@@ -267,8 +278,26 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
     });
 
     const extra: [number, number][] = [];
-    for(let i=0; i<150; i++) {
-        extra.push([(Math.random() - 0.5)*18, (Math.random() - 0.5)*4.5]);
+    const used = new Set<string>();
+    points.forEach(p => used.add(`${p[0].toFixed(2)},${p[1].toFixed(2)}`));
+    
+    for(let i=0; i<250; i++) {
+        const snap = (v: number) => Math.round(v * 2) / 2;
+        let x = snap((Math.random() - 0.5)*20);
+        let z = snap((Math.random() - 0.5)*5);
+        if (z === 0) z = 0.5;
+        let key = `${x.toFixed(2)},${z.toFixed(2)}`;
+        let tries = 0;
+        
+        while (used.has(key) && tries < 10) {
+            x = snap((Math.random() - 0.5)*20);
+            z = snap((Math.random() - 0.5)*5);
+            if (z === 0) z = 0.5;
+            key = `${x.toFixed(2)},${z.toFixed(2)}`;
+            tries++;
+        }
+        used.add(key);
+        extra.push([x, z]);
     }
 
     return [...points.map(p => ({ p, isLogo: true })), ...extra.map(p => ({ p, isLogo: false }))];
@@ -286,7 +315,7 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
       
       const endPos: [number, number, number] = [
         item.p[0],
-        type === 'resistor' ? 0.2 : 0.25, 
+        type === 'resistor' ? 0.35 : 0.25, 
         item.p[1]
       ];
       
@@ -317,7 +346,7 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
       gsap.fromTo(breadboardRef.current.position, 
         { y: -40, z: -20, rotationX: 0.2 },
         {
-          y: -0.3,
+          y: 0,
           z: 0,
           rotationX: 0,
           scrollTrigger: {
@@ -358,15 +387,18 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
       const eRotY = comp.isLogo ? 0 : Math.random() * Math.PI * 0.2;
       const eRotZ = comp.type === 'resistor' ? Math.PI / 2 : 0;
 
+      // Smooth easing curve
+      const easeProgress = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
       // Interpolate
-      mesh.position.x = THREE.MathUtils.lerp(sx, comp.endPos[0], progress);
-      mesh.position.y = THREE.MathUtils.lerp(sy, comp.endPos[1], progress);
-      mesh.position.z = THREE.MathUtils.lerp(sz, comp.endPos[2], progress);
+      mesh.position.x = THREE.MathUtils.lerp(sx, comp.endPos[0], easeProgress);
+      mesh.position.y = THREE.MathUtils.lerp(sy, comp.endPos[1], easeProgress);
+      mesh.position.z = THREE.MathUtils.lerp(sz, comp.endPos[2], easeProgress);
 
       // Simple rotation lerp
-      mesh.rotation.x = THREE.MathUtils.lerp(sRotX, eRotX, progress);
-      mesh.rotation.y = THREE.MathUtils.lerp(sRotY, eRotY, progress);
-      mesh.rotation.z = THREE.MathUtils.lerp(sRotZ, eRotZ, progress);
+      mesh.rotation.x = THREE.MathUtils.lerp(sRotX, eRotX, easeProgress);
+      mesh.rotation.y = THREE.MathUtils.lerp(sRotY, eRotY, easeProgress);
+      mesh.rotation.z = THREE.MathUtils.lerp(sRotZ, eRotZ, easeProgress);
     });
   });
 
@@ -405,8 +437,8 @@ function Rig({ progressRef }: { progressRef: React.MutableRefObject<{value: numb
     const idealOrbitY = 12;
 
     const settledCamX = 0;
-    const settledCamY = 20;
-    const settledCamZ = 6;
+    const settledCamY = 14;
+    const settledCamZ = 12;
 
     const baseCamX = THREE.MathUtils.lerp(idealOrbitX, settledCamX, progress);
     const baseCamY = THREE.MathUtils.lerp(idealOrbitY, settledCamY, progress);
