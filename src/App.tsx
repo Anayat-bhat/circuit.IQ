@@ -3,17 +3,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useEffect } from 'react';
 import { useAppStore } from './store/useAppStore';
 import Navbar from './components/Navbar';
 import LandingPage from './pages/LandingPage';
 import LabStudio from './pages/LabStudio';
 import { AnimatePresence, motion } from 'motion/react';
+import { cn } from './lib/utils';
 
 export default function App() {
-  const { isLabOpen } = useAppStore();
+  const { isLabOpen, theme } = useAppStore();
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
   return (
-    <div className="min-h-screen bg-space-black relative overflow-hidden">
+    <div className={cn("min-h-screen bg-white dark:bg-space-black text-slate-900 dark:text-slate-100 relative overflow-hidden transition-colors duration-300", theme)}>
       <div className="atmospheric-bg" />
       <div className="glow-top-left" />
       <div className="glow-bottom-right" />

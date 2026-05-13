@@ -1,6 +1,6 @@
-import React, { useRef, useMemo, useEffect, useState } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { PerspectiveCamera, Environment, Stars, Sparkles, Trail } from '@react-three/drei';
+import { PerspectiveCamera, Environment, Stars, Sparkles, Trail, QuadraticBezierLine } from '@react-three/drei';
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -36,30 +36,46 @@ function CursorGlitter() {
   );
 }
 
-function FloatingComponent({ position, type, index, delay }: { position: [number, number, number], type: string, index: number, delay: number }) {
+function FloatingComponent({ position, type, index, delay, progressRef, isLogo }: { position: [number, number, number], type: string, index: number, delay: number, progressRef?: React.MutableRefObject<{value: number}>, isLogo?: boolean }) {
   const meshRef = useRef<THREE.Group>(null);
   
   useFrame((state) => {
     if (!meshRef.current) return;
     const t = state.clock.getElapsedTime();
-    // Idle floating animation
-    meshRef.current.rotation.x = Math.sin(t / 4 + index) / 10;
-    meshRef.current.rotation.y = Math.cos(t / 4 + index) / 10;
-    meshRef.current.position.y += Math.sin(t + index) / 200;
+    const progress = progressRef ? progressRef.current.value : 0;
+    
+    // Lerp wobble magnitude based on progress
+    const baseWobbleY = isLogo ? 0 : 0.05;
+    const baseRotX = isLogo ? 0 : Math.sin(t / 2 + index) * 0.1;
+    const baseRotZ = isLogo ? 0 : Math.cos(t / 2 + index) * 0.1;
+
+    const wobbleY = THREE.MathUtils.lerp(0.5, baseWobbleY, progress);
+    const wobbleX = THREE.MathUtils.lerp(0.5, 0, progress);
+
+    meshRef.current.position.y = Math.sin(t * 2 + index) * wobbleY;
+    meshRef.current.position.x = Math.cos(t * 1.5 + index) * wobbleX;
+    
+    meshRef.current.rotation.x = THREE.MathUtils.lerp(t * 0.5 + index, baseRotX, progress);
+    meshRef.current.rotation.y = THREE.MathUtils.lerp(t * 0.8 + index, 0, progress);
+    meshRef.current.rotation.z = THREE.MathUtils.lerp(t * 0.6 + index, baseRotZ, progress);
   });
 
-  return (
+  const ledColor = isLogo ? "#a3e635" : (index % 2 === 0 ? "#4ade80" : "#60a5fa");
+  const ledEmissive = isLogo ? "#84cc16" : (index % 2 === 0 ? "#22c55e" : "#3b82f6");
+
+  const content = (
     <group ref={meshRef} position={position}>
       {type === 'resistor' && (
         <group>
           <mesh rotation={[0, 0, Math.PI / 2]}>
             <capsuleGeometry args={[0.15, 1, 8, 16]} />
-            <meshStandardMaterial color="#e0e0e0" roughness={0.2} metalness={0.8} />
+            <meshStandardMaterial color="#fcd34d" roughness={0.3} metalness={0.2} />
           </mesh>
           <mesh rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.2, 0.2, 0.4, 16]} />
-            <meshStandardMaterial color="#d1d5db" />
+            <meshStandardMaterial color="#c2410c" />
           </mesh>
+          {/* Color bands */}
           <mesh position={[-0.1, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
              <cylinderGeometry args={[0.21, 0.21, 0.05, 16]} />
              <meshBasicMaterial color="#b91c1c" />
@@ -68,62 +84,170 @@ function FloatingComponent({ position, type, index, delay }: { position: [number
              <cylinderGeometry args={[0.21, 0.21, 0.05, 16]} />
              <meshBasicMaterial color="#a16207" />
           </mesh>
+          {/* leads */}
+          <mesh position={[-0.8, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+             <cylinderGeometry args={[0.02, 0.02, 0.6, 8]} />
+             <meshStandardMaterial color="#94a3b8" metalness={0.8} />
+          </mesh>
+          <mesh position={[0.8, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+             <cylinderGeometry args={[0.02, 0.02, 0.6, 8]} />
+             <meshStandardMaterial color="#94a3b8" metalness={0.8} />
+          </mesh>
         </group>
       )}
-      {type === 'capacitor' && (
-        <mesh>
-          <cylinderGeometry args={[0.2, 0.2, 0.6, 16]} />
-          <meshStandardMaterial color="#374151" roughness={0.1} />
-          <mesh position={[0, 0.3, 0]}>
-            <cylinderGeometry args={[0.21, 0.21, 0.1, 16]} />
-            <meshStandardMaterial color="#d1d5db" />
+      {type === 'transistor' && (
+        <group>
+          <mesh position={[0, 0.2, 0]}>
+             <cylinderGeometry args={[0.2, 0.2, 0.4, 16, 1, false, 0, Math.PI]} />
+             <meshStandardMaterial color="#1e293b" roughness={0.7} />
           </mesh>
-        </mesh>
+          <mesh position={[0, 0.2, -0.05]}>
+             <boxGeometry args={[0.4, 0.4, 0.1]} />
+             <meshStandardMaterial color="#1e293b" roughness={0.7} />
+          </mesh>
+          <mesh position={[-0.1, -0.2, 0]}>
+             <cylinderGeometry args={[0.02, 0.02, 0.4]} />
+             <meshStandardMaterial color="#94a3b8" metalness={0.8} />
+          </mesh>
+          <mesh position={[0, -0.2, 0]}>
+             <cylinderGeometry args={[0.02, 0.02, 0.4]} />
+             <meshStandardMaterial color="#94a3b8" metalness={0.8} />
+          </mesh>
+          <mesh position={[0.1, -0.2, 0]}>
+             <cylinderGeometry args={[0.02, 0.02, 0.4]} />
+             <meshStandardMaterial color="#94a3b8" metalness={0.8} />
+          </mesh>
+        </group>
       )}
       {type === 'led' && (
         <group>
-          <mesh position={[0, 0.2, 0]}>
+          <mesh position={[0, 0.3, 0]}>
             <sphereGeometry args={[0.15, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
-            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={2} transparent opacity={0.9} />
+            <meshStandardMaterial color={ledColor} emissive={ledEmissive} emissiveIntensity={3} transparent opacity={0.9} />
           </mesh>
-          <mesh>
-            <cylinderGeometry args={[0.15, 0.15, 0.4, 16]} />
-            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.5} transparent opacity={0.8} />
+          <mesh position={[0, 0.15, 0]}>
+            <cylinderGeometry args={[0.15, 0.15, 0.3, 16]} />
+            <meshStandardMaterial color={ledColor} emissive={ledEmissive} emissiveIntensity={1.5} transparent opacity={0.8} />
           </mesh>
-          <mesh position={[0, -0.2, 0]}>
-            <cylinderGeometry args={[0.16, 0.16, 0.05, 16]} />
-            <meshStandardMaterial color="#9ca3af" />
+          <mesh position={[0, -0.02, 0]}>
+            <cylinderGeometry args={[0.17, 0.17, 0.05, 16]} />
+            <meshStandardMaterial color="#9ca3af" roughness={0.4} />
+          </mesh>
+          <mesh position={[-0.05, -0.2, 0]}>
+            <cylinderGeometry args={[0.02, 0.02, 0.4]} />
+            <meshStandardMaterial color="#94a3b8" metalness={0.8} />
+          </mesh>
+          <mesh position={[0.05, -0.2, 0]}>
+            <cylinderGeometry args={[0.02, 0.02, 0.4]} />
+            <meshStandardMaterial color="#94a3b8" metalness={0.8} />
           </mesh>
         </group>
       )}
     </group>
   );
+
+  return (
+    <Trail 
+      width={0.2} 
+      length={8} 
+      color={new THREE.Color(type === 'led' ? (index % 2 === 0 ? 0.2 : 0.4) : 0.8, type === 'led' ? (index % 2 === 0 ? 0.8 : 0.6) : 0.3, type === 'led' ? 1.0 : 0.1)} 
+      attenuation={(t) => t * t}
+    >
+      {content}
+    </Trail>
+  );
 }
 
-function GridLogoScene() {
+function Breadboard() {
+  return (
+    <group position={[0, -0.3, 0]}>
+       {/* Main body */}
+       <mesh>
+         <boxGeometry args={[22, 0.5, 7]} />
+         <meshStandardMaterial color="#f8fafc" roughness={0.3} />
+       </mesh>
+       {/* Power Rails */}
+       <mesh position={[0, 0.26, -3]}>
+          <planeGeometry args={[21, 0.1]} />
+          <meshBasicMaterial color="#ef4444" />
+       </mesh>
+       <mesh position={[0, 0.26, -2.6]}>
+          <planeGeometry args={[21, 0.1]} />
+          <meshBasicMaterial color="#3b82f6" />
+       </mesh>
+       <mesh position={[0, 0.26, 3]}>
+          <planeGeometry args={[21, 0.1]} />
+          <meshBasicMaterial color="#ef4444" />
+       </mesh>
+       <mesh position={[0, 0.26, 2.6]}>
+          <planeGeometry args={[21, 0.1]} />
+          <meshBasicMaterial color="#3b82f6" />
+       </mesh>
+       {/* Breadboard Holes detail (using gridHelper for lightweight visualization) */}
+       <gridHelper args={[21, 84, 0x000000, 0x000000]} position={[0, 0.251, 0]} material-opacity={0.15} material-transparent />
+    </group>
+  );
+}
+
+function BreadboardWires({ logoPoints }: { logoPoints: any[] }) {
+  const wires = useMemo(() => {
+     const result = [];
+     const pts = logoPoints.filter(p => p.isLogo);
+     if (pts.length === 0) return result;
+     for(let i = 0; i < 40; i++) {
+        const p1 = pts[Math.floor(Math.random() * pts.length)].p;
+        const p2 = pts[Math.floor(Math.random() * pts.length)].p;
+        
+        const color = Math.random() > 0.5 ? '#3b82f6' : (Math.random() > 0.5 ? '#f59e0b' : '#10b981');
+        result.push({
+           start: new THREE.Vector3(p1[0], 0.2, p1[1]),
+           end: new THREE.Vector3(p2[0], 0.2, p2[1]),
+           mid: new THREE.Vector3((p1[0]+p2[0])/2, 1 + Math.random()*2, (p1[1]+p2[1])/2),
+           color
+        });
+     }
+     return result;
+  }, [logoPoints]);
+
+  return (
+     <group>
+        {wires.map((w, i) => (
+            <QuadraticBezierLine key={i} start={w.start} end={w.end} mid={w.mid} color={w.color} lineWidth={1.5} transparent opacity={0.7} />
+        ))}
+     </group>
+  );
+}
+
+function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{value: number}> }) {
+  const breadboardRef = useRef<THREE.Group>(null);
   const containerRef = useRef<THREE.Group>(null);
 
   const logoPoints = useMemo(() => {
-    // Generate an array of points forming a simple "C IQ" or "IQ"
-    const points: [number, number][] = [];
+    const textLines = [
+      " CCCCC  III  RRRR   CCC U   U III TTTTT    III  QQQQ ",
+      " C       I   R   R C    U   U  I    T       I  Q    Q",
+      " C       I   RRRR  C    U   U  I    T       I  Q    Q",
+      " C       I   R  R  C    U   U  I    T       I  Q  Q Q",
+      " CCCCC  III  R   R  CCC  UUU  III   T    . III  QQQQQ"
+    ];
     
-    // C
-    for(let a=0; a<Math.PI; a+=0.3) {
-      points.push([-4 - Math.sin(a)*1.5, Math.cos(a)*2]);
-    }
-    // I
-    for(let y=-2; y<=2; y+=0.5) points.push([0, y]);
-    // Q
-    for(let a=0; a<Math.PI*2; a+=0.3) {
-      points.push([4 + Math.cos(a)*1.5, Math.sin(a)*2]);
-    }
-    points.push([4.8, -1.2]); // Q tail
-    points.push([5.5, -2]);
+    const points: [number, number][] = [];
+    const scaleX = 0.4;
+    const scaleZ = 0.6;
+    const offsetX = (textLines[0].length * scaleX) / 2;
+    const offsetZ = (textLines.length * scaleZ) / 2;
+    
+    textLines.forEach((line, z) => {
+      for (let x = 0; x < line.length; x++) {
+        if (line[x] !== ' ') {
+          points.push([x * scaleX - offsetX, z * scaleZ - offsetZ]);
+        }
+      }
+    });
 
-    // Extra background breadboard grid dots
     const extra: [number, number][] = [];
     for(let i=0; i<150; i++) {
-        extra.push([(Math.random() - 0.5)*20, (Math.random() - 0.5)*10]);
+        extra.push([(Math.random() - 0.5)*20, (Math.random() - 0.5)*5.5]);
     }
 
     return [...points.map(p => ({ p, isLogo: true })), ...extra.map(p => ({ p, isLogo: false }))];
@@ -131,116 +255,169 @@ function GridLogoScene() {
 
   const components = useMemo(() => {
     return logoPoints.map((item, i) => {
-      // Start randomly scattered
-      const startPos: [number, number, number] = [
-        (Math.random() - 0.5) * 40,
-        (Math.random() - 0.5) * 40,
-        (Math.random() - 0.5) * 30
-      ];
+      const type = item.isLogo ? 'led' : (Math.random() > 0.5 ? 'resistor' : 'transistor');
       
-      // End at logo pos
+      const swirlRadius = 8 + Math.random() * 30; // Wider spread
+      const swirlAngle = Math.random() * Math.PI * 2;
+      const swirlY = 10 + (Math.random() - 0.5) * 40; // Taller spread
+      const swirlOrbitSpeed = (Math.random() - 0.5) * 0.4;
+      const swirlVertSpeed = (Math.random() - 0.5) * 0.2;
+      
       const endPos: [number, number, number] = [
         item.p[0],
-        item.p[1],
-        item.isLogo ? 0 : -3 // Extra items slightly back
+        type === 'resistor' ? 0.2 : 0.25, 
+        item.p[1]
       ];
       
-      const type = item.isLogo ? 'led' : (Math.random() > 0.5 ? 'resistor' : 'capacitor');
-      
-      return { startPos, endPos, type, id: i, delay: Math.random() };
+      return { 
+        type, id: i, delay: Math.random(), 
+        swirlRadius, swirlAngle, swirlY, swirlOrbitSpeed, swirlVertSpeed, endPos,
+        isLogo: item.isLogo
+      };
     });
   }, [logoPoints]);
 
   const refs = useRef<THREE.Group[]>([]);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-
-    components.forEach((comp, i) => {
-      const mesh = refs.current[i];
-      if (mesh) {
-        gsap.to(mesh.position, {
-          x: comp.endPos[0],
-          y: comp.endPos[1],
-          z: comp.endPos[2],
-          scrollTrigger: {
-            trigger: "#root",
-            start: "top top",
-            end: "bottom bottom",
-            scrub: 1,
-          }
-        });
-        
-        gsap.to(mesh.rotation, {
-          x: comp.type === 'resistor' ? 0 : Math.PI / 2,
-          y: 0,
-          z: comp.type === 'resistor' ? Math.PI / 2 : 0,
-          scrollTrigger: {
-            trigger: "#root",
-            start: "top top",
-            end: "bottom bottom",
-            scrub: 1,
-          }
-        });
-      }
-    });
-
-    gsap.to(containerRef.current.position, {
-      y: 2,
-      z: -10,
-      rotationX: 0.2,
+    // Animate the progress value from 0 (swirling) to 1 (breadboard)
+    gsap.to(progressRef.current, {
+      value: 1,
       scrollTrigger: {
-        trigger: "#root",
-        start: "top top",
-        end: "bottom bottom",
+        trigger: "#simulation-section",
+        start: "top center",
+        end: "center center",
         scrub: 1,
       }
     });
 
-  }, [components]);
+    // Bring the breadboard up from the void
+    if (breadboardRef.current) {
+      gsap.fromTo(breadboardRef.current.position, 
+        { y: -40, z: -20, rotationX: 0.2 },
+        {
+          y: -0.3,
+          z: 0,
+          rotationX: 0,
+          scrollTrigger: {
+            trigger: "#simulation-section",
+            start: "top center",
+            end: "center center",
+            scrub: 1,
+          }
+        }
+      );
+      
+      // opacity fade-in for the breadboard might not work directly on a group without material traversal,
+      // so we just rely on it flying in from below
+    }
+
+  }, []);
+
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+    const progress = progressRef.current.value;
+
+    components.forEach((comp, i) => {
+      const mesh = refs.current[i];
+      if (!mesh) return;
+
+      // Swirl Positions
+      const sx = Math.cos(comp.swirlAngle + t * comp.swirlOrbitSpeed) * comp.swirlRadius;
+      const sz = Math.sin(comp.swirlAngle + t * comp.swirlOrbitSpeed) * comp.swirlRadius;
+      const sy = comp.swirlY + Math.sin(t * comp.swirlVertSpeed) * 10;
+      
+      // Swirl Rotations
+      const sRotX = t * comp.swirlOrbitSpeed;
+      const sRotY = comp.swirlAngle + t * comp.swirlOrbitSpeed;
+      const sRotZ = t * comp.swirlVertSpeed;
+
+      // End Rotations
+      const eRotX = 0;
+      const eRotY = comp.isLogo ? 0 : Math.random() * Math.PI * 0.2;
+      const eRotZ = comp.type === 'resistor' ? Math.PI / 2 : 0;
+
+      // Interpolate
+      mesh.position.x = THREE.MathUtils.lerp(sx, comp.endPos[0], progress);
+      mesh.position.y = THREE.MathUtils.lerp(sy, comp.endPos[1], progress);
+      mesh.position.z = THREE.MathUtils.lerp(sz, comp.endPos[2], progress);
+
+      // Simple rotation lerp
+      mesh.rotation.x = THREE.MathUtils.lerp(sRotX, eRotX, progress);
+      mesh.rotation.y = THREE.MathUtils.lerp(sRotY, eRotY, progress);
+      mesh.rotation.z = THREE.MathUtils.lerp(sRotZ, eRotZ, progress);
+    });
+  });
 
   return (
     <group ref={containerRef}>
+      <group ref={breadboardRef}>
+        <Breadboard />
+        <BreadboardWires logoPoints={logoPoints} />
+      </group>
       {components.map((comp, i) => (
         <group 
           key={comp.id} 
           ref={el => el && (refs.current[i] = el)} 
-          position={comp.startPos}
-          rotation={[Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI]}
         >
-          <FloatingComponent position={[0,0,0]} type={comp.type} index={comp.id} delay={comp.delay} />
+          <FloatingComponent position={[0,0,0]} type={comp.type} index={comp.id} delay={comp.delay} progressRef={progressRef} isLogo={comp.isLogo} />
         </group>
       ))}
-      {/* White sparkling stars instead of simple dots */}
-      <Sparkles count={100} scale={20} size={2} color="#ffffff" opacity={0.6} speed={0.4} />
-      <Stars radius={100} depth={50} count={3000} factor={3} saturation={0} fade speed={1} />
+      <Sparkles count={250} scale={35} size={2.5} color="#60a5fa" opacity={0.8} speed={0.5} />
+      <Stars radius={100} depth={50} count={4000} factor={3} saturation={1} fade speed={1.5} />
     </group>
   );
 }
 
-function Rig() {
+function Rig({ progressRef }: { progressRef: React.MutableRefObject<{value: number}> }) {
   const { camera, mouse } = useThree();
   const vec = new THREE.Vector3();
+  const target = new THREE.Vector3(0, 0, 0);
 
-  return useFrame(() => {
-    camera.position.lerp(vec.set(mouse.x * 3, mouse.y * 3, camera.position.z), 0.05);
-    camera.lookAt(0, 0, 0);
+  return useFrame(({ clock }) => {
+    const progress = progressRef.current ? progressRef.current.value : 0;
+    const t = clock.getElapsedTime() * 0.2; 
+    
+    // When swirling, orbit widely. When settled, lock to front-ish view for readability.
+    const idealOrbitX = Math.sin(t) * 28;
+    const idealOrbitZ = Math.cos(t) * 28;
+    const idealOrbitY = 12;
+
+    const settledCamX = 0;
+    const settledCamY = 12;
+    const settledCamZ = 16;
+
+    const baseCamX = THREE.MathUtils.lerp(idealOrbitX, settledCamX, progress);
+    const baseCamY = THREE.MathUtils.lerp(idealOrbitY, settledCamY, progress);
+    const baseCamZ = THREE.MathUtils.lerp(idealOrbitZ, settledCamZ, progress);
+
+    const mouseMultX = THREE.MathUtils.lerp(30, 3, progress);
+    const mouseMultY = THREE.MathUtils.lerp(25, 2, progress);
+    
+    const targetX = baseCamX + mouse.x * mouseMultX;
+    const targetY = baseCamY + mouse.y * mouseMultY;
+    const targetZ = baseCamZ;
+
+    camera.position.lerp(vec.set(targetX, targetY, targetZ), 0.05);
+    camera.lookAt(target);
   });
 }
 
 export default function AntigravityHero() {
+  const progressRef = useRef({ value: 0 });
   return (
-    <div className="fixed inset-0 pointer-events-none">
+    <div className="fixed inset-0 pointer-events-none z-0">
       <Canvas dpr={[1, 2]}>
-        <PerspectiveCamera makeDefault position={[0, 0, 12]} fov={50} />
-        <ambientLight intensity={0.8} />
-        <pointLight position={[10, 10, 10]} intensity={1.5} color="#ffffff" />
-        <pointLight position={[-10, -10, -10]} intensity={0.8} color="#f8fafc" />
+        <PerspectiveCamera makeDefault position={[0, 12, 22]} fov={45} />
+        <ambientLight intensity={0.6} />
+        <spotLight position={[15, 20, 15]} angle={0.3} penumbra={1} intensity={2} color="#ffffff" castShadow />
+        <pointLight position={[-10, 5, -10]} intensity={1.5} color="#3b82f6" />
+        <pointLight position={[10, 5, 10]} intensity={1} color="#fcf0d5" />
         
         <CursorGlitter />
-        <GridLogoScene />
-        <Rig />
-        <Environment preset="city" />
+        <GridLogoScene progressRef={progressRef} />
+        <Rig progressRef={progressRef} />
+        <Environment preset="night" />
       </Canvas>
     </div>
   );

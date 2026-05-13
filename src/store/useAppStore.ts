@@ -7,6 +7,8 @@ interface LabState {
   setLabOpen: (open: boolean) => void;
   physicsBotOpen: boolean;
   setPhysicsBotOpen: (open: boolean) => void;
+  theme: 'light' | 'dark';
+  toggleTheme: () => void;
 }
 
 export const useAppStore = create<LabState>((set) => ({
@@ -16,4 +18,6 @@ export const useAppStore = create<LabState>((set) => ({
   setLabOpen: (open) => set({ isLabOpen: open }),
   physicsBotOpen: false,
   setPhysicsBotOpen: (open) => set({ physicsBotOpen: open }),
+  theme: 'light',
+  toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
 }));
