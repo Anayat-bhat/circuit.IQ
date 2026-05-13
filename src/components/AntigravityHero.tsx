@@ -1,6 +1,7 @@
 import React, { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { PerspectiveCamera, Environment, Stars, Sparkles, Trail, QuadraticBezierLine } from '@react-three/drei';
+import { PerspectiveCamera, Environment, Stars, Sparkles, Trail, QuadraticBezierLine, Float } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -62,6 +63,7 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
 
   const ledColor = isLogo ? "#a3e635" : (index % 2 === 0 ? "#4ade80" : "#60a5fa");
   const ledEmissive = isLogo ? "#84cc16" : (index % 2 === 0 ? "#22c55e" : "#3b82f6");
+  const emissiveFactor = isLogo ? 6 : 2;
 
   const content = (
     <group ref={meshRef} position={position}>
@@ -87,11 +89,11 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
           {/* leads */}
           <mesh position={[-0.8, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
              <cylinderGeometry args={[0.02, 0.02, 0.6, 8]} />
-             <meshStandardMaterial color="#94a3b8" metalness={0.8} />
+             <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
           </mesh>
           <mesh position={[0.8, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
              <cylinderGeometry args={[0.02, 0.02, 0.6, 8]} />
-             <meshStandardMaterial color="#94a3b8" metalness={0.8} />
+             <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
           </mesh>
         </group>
       )}
@@ -99,47 +101,47 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
         <group>
           <mesh position={[0, 0.2, 0]}>
              <cylinderGeometry args={[0.2, 0.2, 0.4, 16, 1, false, 0, Math.PI]} />
-             <meshStandardMaterial color="#1e293b" roughness={0.7} />
+             <meshStandardMaterial color="#0f172a" roughness={0.9} />
           </mesh>
           <mesh position={[0, 0.2, -0.05]}>
              <boxGeometry args={[0.4, 0.4, 0.1]} />
-             <meshStandardMaterial color="#1e293b" roughness={0.7} />
+             <meshStandardMaterial color="#0f172a" roughness={0.9} />
           </mesh>
           <mesh position={[-0.1, -0.2, 0]}>
              <cylinderGeometry args={[0.02, 0.02, 0.4]} />
-             <meshStandardMaterial color="#94a3b8" metalness={0.8} />
+             <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
           </mesh>
           <mesh position={[0, -0.2, 0]}>
              <cylinderGeometry args={[0.02, 0.02, 0.4]} />
-             <meshStandardMaterial color="#94a3b8" metalness={0.8} />
+             <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
           </mesh>
           <mesh position={[0.1, -0.2, 0]}>
              <cylinderGeometry args={[0.02, 0.02, 0.4]} />
-             <meshStandardMaterial color="#94a3b8" metalness={0.8} />
+             <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
           </mesh>
         </group>
       )}
       {type === 'led' && (
         <group>
-          <mesh position={[0, 0.3, 0]}>
-            <sphereGeometry args={[0.15, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
-            <meshStandardMaterial color={ledColor} emissive={ledEmissive} emissiveIntensity={3} transparent opacity={0.9} />
+          <mesh position={[0, 0.4, 0]}>
+            <sphereGeometry args={[0.18, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <meshStandardMaterial color={ledColor} emissive={ledEmissive} emissiveIntensity={emissiveFactor} transparent opacity={0.9} roughness={0.1} />
           </mesh>
-          <mesh position={[0, 0.15, 0]}>
-            <cylinderGeometry args={[0.15, 0.15, 0.3, 16]} />
-            <meshStandardMaterial color={ledColor} emissive={ledEmissive} emissiveIntensity={1.5} transparent opacity={0.8} />
+          <mesh position={[0, 0.2, 0]}>
+            <cylinderGeometry args={[0.18, 0.18, 0.4, 16]} />
+            <meshStandardMaterial color={ledColor} emissive={ledEmissive} emissiveIntensity={emissiveFactor * 0.8} transparent opacity={0.8} roughness={0.1} />
           </mesh>
           <mesh position={[0, -0.02, 0]}>
-            <cylinderGeometry args={[0.17, 0.17, 0.05, 16]} />
+            <cylinderGeometry args={[0.2, 0.2, 0.05, 16]} />
             <meshStandardMaterial color="#9ca3af" roughness={0.4} />
           </mesh>
-          <mesh position={[-0.05, -0.2, 0]}>
+          <mesh position={[-0.08, -0.2, 0]}>
             <cylinderGeometry args={[0.02, 0.02, 0.4]} />
-            <meshStandardMaterial color="#94a3b8" metalness={0.8} />
+            <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
           </mesh>
-          <mesh position={[0.05, -0.2, 0]}>
+          <mesh position={[0.08, -0.2, 0]}>
             <cylinderGeometry args={[0.02, 0.02, 0.4]} />
-            <meshStandardMaterial color="#94a3b8" metalness={0.8} />
+            <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
           </mesh>
         </group>
       )}
@@ -164,27 +166,36 @@ function Breadboard() {
        {/* Main body */}
        <mesh>
          <boxGeometry args={[22, 0.5, 7]} />
-         <meshStandardMaterial color="#f8fafc" roughness={0.3} />
+         <meshStandardMaterial color="#cbd5e1" roughness={0.6} />
        </mesh>
-       {/* Power Rails */}
-       <mesh position={[0, 0.26, -3]}>
-          <planeGeometry args={[21, 0.1]} />
-          <meshBasicMaterial color="#ef4444" />
+       {/* Center Trough */}
+       <mesh position={[0, 0.255, 0]}>
+         <boxGeometry args={[21.5, 0.1, 0.4]} />
+         <meshStandardMaterial color="#94a3b8" />
        </mesh>
-       <mesh position={[0, 0.26, -2.6]}>
-          <planeGeometry args={[21, 0.1]} />
-          <meshBasicMaterial color="#3b82f6" />
+       {/* Power Rails */ /* Top */}
+       <mesh position={[0, 0.255, -2.9]}>
+          <planeGeometry args={[20.5, 0.05]} rotation={[-Math.PI/2, 0, 0]} />
+          <meshBasicMaterial color="#ef4444" opacity={0.6} transparent />
        </mesh>
-       <mesh position={[0, 0.26, 3]}>
-          <planeGeometry args={[21, 0.1]} />
-          <meshBasicMaterial color="#ef4444" />
+       <mesh position={[0, 0.255, -2.3]}>
+          <planeGeometry args={[20.5, 0.05]} rotation={[-Math.PI/2, 0, 0]} />
+          <meshBasicMaterial color="#3b82f6" opacity={0.6} transparent />
        </mesh>
-       <mesh position={[0, 0.26, 2.6]}>
-          <planeGeometry args={[21, 0.1]} />
-          <meshBasicMaterial color="#3b82f6" />
+       {/* Power Rails */ /* Bottom */}
+       <mesh position={[0, 0.255, 2.3]}>
+          <planeGeometry args={[20.5, 0.05]} rotation={[-Math.PI/2, 0, 0]} />
+          <meshBasicMaterial color="#3b82f6" opacity={0.6} transparent />
        </mesh>
-       {/* Breadboard Holes detail (using gridHelper for lightweight visualization) */}
-       <gridHelper args={[21, 84, 0x000000, 0x000000]} position={[0, 0.251, 0]} material-opacity={0.15} material-transparent />
+       <mesh position={[0, 0.255, 2.9]}>
+          <planeGeometry args={[20.5, 0.05]} rotation={[-Math.PI/2, 0, 0]} />
+          <meshBasicMaterial color="#ef4444" opacity={0.6} transparent />
+       </mesh>
+       
+       {/* Grid representation of holes */}
+       <group position={[0, 0.251, 0]}>
+         <gridHelper args={[21, 84, 0x0f172a, 0x0f172a]} material-opacity={0.3} material-transparent />
+       </group>
     </group>
   );
 }
@@ -194,15 +205,25 @@ function BreadboardWires({ logoPoints }: { logoPoints: any[] }) {
      const result = [];
      const pts = logoPoints.filter(p => p.isLogo);
      if (pts.length === 0) return result;
+     
+     // Generate some fixed wire positions around the breadboard to look like connections
      for(let i = 0; i < 40; i++) {
         const p1 = pts[Math.floor(Math.random() * pts.length)].p;
-        const p2 = pts[Math.floor(Math.random() * pts.length)].p;
+        // Make wires go from random points to other random points, or the power rails
+        const toRail = Math.random() > 0.5;
+        const p2 = toRail ? [p1[0] + (Math.random() - 0.5) * 4, Math.random() > 0.5 ? 2.8 : -2.8] : pts[Math.floor(Math.random() * pts.length)].p;
         
-        const color = Math.random() > 0.5 ? '#3b82f6' : (Math.random() > 0.5 ? '#f59e0b' : '#10b981');
+        const dist = Math.sqrt(Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2));
+        
+        const colorDecider = Math.random();
+        let color = '#3b82f6';
+        if (toRail) color = p2[1] > 0 ? (Math.random() > 0.5 ? '#ef4444' : '#3b82f6') : (Math.random() > 0.5 ? '#ef4444' : '#10b981');
+        else color = colorDecider > 0.6 ? '#f59e0b' : (colorDecider > 0.3 ? '#10b981' : '#a855f7');
+        
         result.push({
            start: new THREE.Vector3(p1[0], 0.2, p1[1]),
            end: new THREE.Vector3(p2[0], 0.2, p2[1]),
-           mid: new THREE.Vector3((p1[0]+p2[0])/2, 1 + Math.random()*2, (p1[1]+p2[1])/2),
+           mid: new THREE.Vector3((p1[0]+p2[0])/2, 0.5 + dist * 0.2, (p1[1]+p2[1])/2),
            color
         });
      }
@@ -212,7 +233,7 @@ function BreadboardWires({ logoPoints }: { logoPoints: any[] }) {
   return (
      <group>
         {wires.map((w, i) => (
-            <QuadraticBezierLine key={i} start={w.start} end={w.end} mid={w.mid} color={w.color} lineWidth={1.5} transparent opacity={0.7} />
+            <QuadraticBezierLine key={i} start={w.start} end={w.end} mid={w.mid} color={w.color} lineWidth={2} transparent opacity={0.6} />
         ))}
      </group>
   );
@@ -247,7 +268,7 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
 
     const extra: [number, number][] = [];
     for(let i=0; i<150; i++) {
-        extra.push([(Math.random() - 0.5)*20, (Math.random() - 0.5)*5.5]);
+        extra.push([(Math.random() - 0.5)*18, (Math.random() - 0.5)*4.5]);
     }
 
     return [...points.map(p => ({ p, isLogo: true })), ...extra.map(p => ({ p, isLogo: false }))];
@@ -384,15 +405,15 @@ function Rig({ progressRef }: { progressRef: React.MutableRefObject<{value: numb
     const idealOrbitY = 12;
 
     const settledCamX = 0;
-    const settledCamY = 12;
-    const settledCamZ = 16;
+    const settledCamY = 20;
+    const settledCamZ = 6;
 
     const baseCamX = THREE.MathUtils.lerp(idealOrbitX, settledCamX, progress);
     const baseCamY = THREE.MathUtils.lerp(idealOrbitY, settledCamY, progress);
     const baseCamZ = THREE.MathUtils.lerp(idealOrbitZ, settledCamZ, progress);
 
-    const mouseMultX = THREE.MathUtils.lerp(30, 3, progress);
-    const mouseMultY = THREE.MathUtils.lerp(25, 2, progress);
+    const mouseMultX = THREE.MathUtils.lerp(30, 2, progress);
+    const mouseMultY = THREE.MathUtils.lerp(25, 1, progress);
     
     const targetX = baseCamX + mouse.x * mouseMultX;
     const targetY = baseCamY + mouse.y * mouseMultY;
@@ -418,6 +439,10 @@ export default function AntigravityHero() {
         <GridLogoScene progressRef={progressRef} />
         <Rig progressRef={progressRef} />
         <Environment preset="night" />
+        <EffectComposer disableNormalPass>
+          <Bloom luminanceThreshold={0.5} mipmapBlur intensity={1.5} />
+          <Vignette eskil={false} offset={0.1} darkness={0.8} />
+        </EffectComposer>
       </Canvas>
     </div>
   );
