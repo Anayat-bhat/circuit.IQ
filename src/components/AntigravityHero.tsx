@@ -76,8 +76,8 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
   const ledEmissive = isLogo ? "#84cc16" : (index % 2 === 0 ? "#22c55e" : "#3b82f6");
   const emissiveFactor = isLogo ? 6 : 2;
 
-  const content = (
-    <group ref={meshRef} position={position}>
+  return (
+    <group ref={meshRef} position={position} scale={0.5}>
       {type === 'resistor' && (
         <group>
           <mesh rotation={[0, 0, Math.PI / 2]}>
@@ -157,17 +157,6 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
         </group>
       )}
     </group>
-  );
-
-  return (
-    <Trail 
-      width={0.2} 
-      length={8} 
-      color={new THREE.Color(type === 'led' ? (index % 2 === 0 ? 0.2 : 0.4) : 0.8, type === 'led' ? (index % 2 === 0 ? 0.8 : 0.6) : 0.3, type === 'led' ? 1.0 : 0.1)} 
-      attenuation={(t) => t * t}
-    >
-      {content}
-    </Trail>
   );
 }
 
