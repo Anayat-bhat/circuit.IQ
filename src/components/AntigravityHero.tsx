@@ -42,6 +42,10 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
   const materialRef1 = useRef<THREE.MeshStandardMaterial>(null);
   const materialRef2 = useRef<THREE.MeshStandardMaterial>(null);
   
+  const ledColor = isLogo ? "#22d3ee" : (index % 2 === 0 ? "#f472b6" : "#fbbf24");
+  const ledEmissive = isLogo ? "#06b6d4" : (index % 2 === 0 ? "#ec4899" : "#f59e0b");
+  const emissiveFactor = isLogo ? 6 : 2;
+
   useFrame((state) => {
     if (!meshRef.current) return;
     const t = state.clock.getElapsedTime();
@@ -54,8 +58,8 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
 
     const easeProgress = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
 
-    const wobbleY = THREE.MathUtils.lerp(0.5, baseWobbleY, easeProgress);
-    const wobbleX = THREE.MathUtils.lerp(0.5, 0, easeProgress);
+    const wobbleY = THREE.MathUtils.lerp(0.5, baseWobbleY, Math.min(1, easeProgress * 1.5));
+    const wobbleX = THREE.MathUtils.lerp(0.5, 0, Math.min(1, easeProgress * 1.5));
 
     meshRef.current.position.y = Math.sin(t * 2 + index) * wobbleY;
     meshRef.current.position.x = Math.cos(t * 1.5 + index) * wobbleX;
@@ -64,20 +68,38 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
     meshRef.current.rotation.y = THREE.MathUtils.lerp(t * 0.8 + index, 0, easeProgress);
     meshRef.current.rotation.z = THREE.MathUtils.lerp(t * 0.6 + index, baseRotZ, easeProgress);
 
-    if (materialRef1.current) {
-        materialRef1.current.emissiveIntensity = THREE.MathUtils.lerp(0.1, emissiveFactor, Math.pow(progress, 4));
-    }
-    if (materialRef2.current) {
-        materialRef2.current.emissiveIntensity = THREE.MathUtils.lerp(0.05, emissiveFactor * 0.8, Math.pow(progress, 4));
+    // Dynamic color and blinking logic for LEDs
+    if (materialRef1.current && materialRef2.current) {
+        if (type === 'led') {
+            const blinkSpeed = isLogo ? 3 : 1;
+            const timeOffset = index * 0.5;
+            
+            // Randomly blink off
+            const blinkPhase = Math.sin(t * blinkSpeed + timeOffset);
+            const isBlinking = progress > 0.95 && blinkPhase > 0.8;
+            
+            let currentEmissiveIntensity = isBlinking ? 0.0 : THREE.MathUtils.lerp(0.1, emissiveFactor, Math.pow(progress, 4));
+
+            // Slight color shifting
+            if (progress > 0.9) {
+                const targetColor = new THREE.Color(ledEmissive);
+                targetColor.offsetHSL(Math.sin(t * 0.5 + index) * 0.05, 0, 0); // shift hue slightly
+                materialRef1.current.emissive.copy(targetColor);
+                materialRef2.current.emissive.copy(targetColor);
+                currentEmissiveIntensity *= (1 + Math.sin(t * 5 + index) * 0.2); // pulse
+            }
+
+            materialRef1.current.emissiveIntensity = currentEmissiveIntensity;
+            materialRef2.current.emissiveIntensity = currentEmissiveIntensity * 0.8;
+        } else {
+            materialRef1.current.emissiveIntensity = THREE.MathUtils.lerp(0.1, emissiveFactor, Math.pow(progress, 4));
+            materialRef2.current.emissiveIntensity = THREE.MathUtils.lerp(0.05, emissiveFactor * 0.8, Math.pow(progress, 4));
+        }
     }
   });
 
-  const ledColor = isLogo ? "#a3e635" : (index % 2 === 0 ? "#4ade80" : "#60a5fa");
-  const ledEmissive = isLogo ? "#84cc16" : (index % 2 === 0 ? "#22c55e" : "#3b82f6");
-  const emissiveFactor = isLogo ? 6 : 2;
-
   return (
-    <group ref={meshRef} position={position} scale={0.5}>
+    <group ref={meshRef} position={position} scale={0.8}>
       {type === 'resistor' && (
         <group>
           <mesh rotation={[0, 0, Math.PI / 2]}>
@@ -174,21 +196,21 @@ function Breadboard() {
          <meshStandardMaterial color="#94a3b8" />
        </mesh>
        {/* Power Rails */ /* Top */}
-       <mesh position={[0, 0.255, -2.9]}>
-          <planeGeometry args={[20.5, 0.05]} rotation={[-Math.PI/2, 0, 0]} />
+       <mesh position={[0, 0.255, -2.9]} rotation={[-Math.PI/2, 0, 0]}>
+          <planeGeometry args={[20.5, 0.05]} />
           <meshBasicMaterial color="#ef4444" opacity={0.6} transparent />
        </mesh>
-       <mesh position={[0, 0.255, -2.3]}>
-          <planeGeometry args={[20.5, 0.05]} rotation={[-Math.PI/2, 0, 0]} />
+       <mesh position={[0, 0.255, -2.3]} rotation={[-Math.PI/2, 0, 0]}>
+          <planeGeometry args={[20.5, 0.05]} />
           <meshBasicMaterial color="#3b82f6" opacity={0.6} transparent />
        </mesh>
        {/* Power Rails */ /* Bottom */}
-       <mesh position={[0, 0.255, 2.3]}>
-          <planeGeometry args={[20.5, 0.05]} rotation={[-Math.PI/2, 0, 0]} />
+       <mesh position={[0, 0.255, 2.3]} rotation={[-Math.PI/2, 0, 0]}>
+          <planeGeometry args={[20.5, 0.05]} />
           <meshBasicMaterial color="#3b82f6" opacity={0.6} transparent />
        </mesh>
-       <mesh position={[0, 0.255, 2.9]}>
-          <planeGeometry args={[20.5, 0.05]} rotation={[-Math.PI/2, 0, 0]} />
+       <mesh position={[0, 0.255, 2.9]} rotation={[-Math.PI/2, 0, 0]}>
+          <planeGeometry args={[20.5, 0.05]} />
           <meshBasicMaterial color="#ef4444" opacity={0.6} transparent />
        </mesh>
        
@@ -308,10 +330,14 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
         item.p[1]
       ];
       
+      const crazyX = (Math.random() - 0.5) * 15;
+      const crazyY = (Math.random() - 0.5) * 15;
+      const crazyZ = (Math.random() - 0.5) * 15;
+      
       return { 
         type, id: i, delay: Math.random(), 
         swirlRadius, swirlAngle, swirlY, swirlOrbitSpeed, swirlVertSpeed, endPos,
-        isLogo: item.isLogo
+        isLogo: item.isLogo, crazyX, crazyY, crazyZ
       };
     });
   }, [logoPoints]);
@@ -346,11 +372,7 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
           }
         }
       );
-      
-      // opacity fade-in for the breadboard might not work directly on a group without material traversal,
-      // so we just rely on it flying in from below
     }
-
   }, []);
 
   useFrame((state) => {
@@ -372,17 +394,35 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
       const sRotZ = t * comp.swirlVertSpeed;
 
       // End Rotations
-      const eRotX = 0;
-      const eRotY = comp.isLogo ? 0 : Math.random() * Math.PI * 0.2;
-      const eRotZ = comp.type === 'resistor' ? Math.PI / 2 : 0;
+      let eRotX = 0;
+      let eRotY = comp.isLogo ? 0 : Math.random() * Math.PI * 0.2;
+      let eRotZ = comp.type === 'resistor' ? Math.PI / 2 : 0;
 
       // Smooth easing curve
-      const easeProgress = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+      let easeProgress = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+      let targetX = comp.endPos[0];
+      let targetY = comp.endPos[1];
+      let targetZ = comp.endPos[2];
+
+      if (comp.isLogo && progress > 0.3 && progress < 0.95) {
+          // Crazy scramble before settling
+          const intensity = Math.sin((progress - 0.3) * Math.PI / 0.65); // peaks around 0.6
+          targetX += comp.crazyX * intensity;
+          targetY += Math.abs(comp.crazyY * intensity); // bounce upwards
+          targetZ += comp.crazyZ * intensity;
+          
+          eRotX += comp.crazyX * intensity;
+          eRotY += comp.crazyY * intensity;
+          eRotZ += comp.crazyZ * intensity;
+
+          easeProgress += (Math.sin(t * 15 + comp.id) * 0.15 * intensity); // jitter
+      }
 
       // Interpolate
-      mesh.position.x = THREE.MathUtils.lerp(sx, comp.endPos[0], easeProgress);
-      mesh.position.y = THREE.MathUtils.lerp(sy, comp.endPos[1], easeProgress);
-      mesh.position.z = THREE.MathUtils.lerp(sz, comp.endPos[2], easeProgress);
+      mesh.position.x = THREE.MathUtils.lerp(sx, targetX, Math.max(0, Math.min(1, easeProgress)));
+      mesh.position.y = THREE.MathUtils.lerp(sy, targetY, Math.max(0, Math.min(1, easeProgress)));
+      mesh.position.z = THREE.MathUtils.lerp(sz, targetZ, Math.max(0, Math.min(1, easeProgress)));
 
       // Simple rotation lerp
       mesh.rotation.x = THREE.MathUtils.lerp(sRotX, eRotX, easeProgress);
@@ -447,8 +487,24 @@ function Rig({ progressRef }: { progressRef: React.MutableRefObject<{value: numb
 
 export default function AntigravityHero() {
   const progressRef = useRef({ value: 0 });
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+     if (wrapperRef.current) {
+        gsap.to(wrapperRef.current, {
+           opacity: 0,
+           scrollTrigger: {
+              trigger: "#simulation-section",
+              start: "bottom center",
+              end: "bottom top",
+              scrub: true,
+           }
+        });
+     }
+  }, []);
+
   return (
-    <div className="fixed inset-0 pointer-events-none z-0">
+    <div ref={wrapperRef} className="fixed inset-0 pointer-events-none z-0">
       <Canvas dpr={[1, 2]}>
         <PerspectiveCamera makeDefault position={[0, 12, 22]} fov={45} />
         <ambientLight intensity={0.6} />
@@ -460,7 +516,7 @@ export default function AntigravityHero() {
         <GridLogoScene progressRef={progressRef} />
         <Rig progressRef={progressRef} />
         <Environment preset="night" />
-        <EffectComposer disableNormalPass>
+        <EffectComposer>
           <Bloom luminanceThreshold={0.5} mipmapBlur intensity={1.5} />
           <Vignette eskil={false} offset={0.1} darkness={0.8} />
         </EffectComposer>
