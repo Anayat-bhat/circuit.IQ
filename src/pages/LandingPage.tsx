@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { motion } from 'motion/react';
+import { motion, useScroll, useTransform } from 'motion/react';
 import AntigravityHero from '../components/AntigravityHero';
 import { useAppStore } from '../store/useAppStore';
 import { Zap, Cpu, MousePointer2, FlaskConical } from 'lucide-react';
@@ -8,6 +8,15 @@ import Lenis from 'lenis';
 export default function LandingPage() {
   const { setLabOpen } = useAppStore();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { scrollY } = useScroll();
+  
+  const yText = useTransform(scrollY, [0, 800], [0, 250]);
+  const scaleText = useTransform(scrollY, [0, 800], [1, 0.8]);
+  const opacityText = useTransform(scrollY, [0, 600], [1, 0]);
+  const trackingText = useTransform(scrollY, [0, 800], ["-0.05em", "0.15em"]);
+  const rotateXText = useTransform(scrollY, [0, 800], [0, 45]);
+  const rotateZText = useTransform(scrollY, [0, 800], [0, 5]);
+  const blurText = useTransform(scrollY, [0, 600], ["blur(0px)", "blur(10px)"]);
 
   useEffect(() => {
     const lenis = new Lenis();
@@ -36,15 +45,29 @@ export default function LandingPage() {
             <span>Next-Gen Simulation Engine</span>
           </div>
           
-          <h1 className="text-8xl md:text-9xl font-display font-bold tracking-tighter text-cinematic mb-6 leading-none">
+          <motion.h1 
+            style={{ 
+              y: yText, 
+              scale: scaleText, 
+              opacity: opacityText, 
+              letterSpacing: trackingText,
+              rotateX: rotateXText,
+              rotateZ: rotateZText,
+              filter: blurText
+            }}
+            className="text-8xl md:text-9xl font-display font-bold text-cinematic mb-6 leading-none"
+          >
             Circuit.IQ
-          </h1>
+          </motion.h1>
           
-          <p className="max-w-2xl mx-auto text-2xl text-slate-500 dark:text-slate-400 font-light italic mb-12 leading-relaxed">
+          <motion.p 
+            style={{ y: useTransform(scrollY, [0, 800], [0, 200]), opacity: opacityText }}
+            className="max-w-2xl mx-auto text-2xl text-slate-500 dark:text-slate-400 font-light italic mb-12 leading-relaxed"
+          >
             AI-Powered Virtual Physics Laboratory for the <span className="text-blue-600 dark:text-blue-400">Modern Engineer</span>.
-          </p>
+          </motion.p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+          <motion.div style={{ opacity: opacityText }} className="flex flex-col sm:flex-row items-center justify-center gap-6">
             <button 
               onClick={() => setLabOpen(true)}
               className="px-10 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl flex items-center gap-2 hover:bg-slate-800 dark:hover:bg-slate-200 transition-all hover:scale-105 active:scale-95 shadow-xl shadow-slate-900/10 dark:shadow-white/10"
@@ -55,7 +78,7 @@ export default function LandingPage() {
             <button className="px-10 py-4 bg-transparent border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
               Explore Library
             </button>
-          </div>
+          </motion.div>
         </motion.div>
 
         <motion.div 
@@ -69,33 +92,8 @@ export default function LandingPage() {
       </section>
 
       {/* Assembly Section */}
-      <section id="simulation-section" className="relative h-[200vh] flex flex-col items-center justify-center pointer-events-none">
-         <motion.div 
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="glass-panel p-12 max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-12 z-20"
-          >
-            <div>
-              <h2 className="text-4xl font-display font-bold mb-6 text-slate-900 dark:text-white">Real-time Simulation</h2>
-              <p className="text-slate-600 dark:text-slate-400 mb-8 leading-relaxed">
-                Experience physics like never before. Our custom-built solver handles thousands of nodes in real-time, providing immediate feedback for electronic circuits, electromagnetic fields, and wave propagation.
-              </p>
-              <div className="flex flex-col gap-4">
-                <FeatureItem icon={<Cpu size={20}/>} title="SPICE-compliant solver" description="Industry standard accuracy in your browser." />
-                <FeatureItem icon={<Zap size={20}/>} title="High-frequency analysis" description="Simulate signals up to 10GHz with ease." />
-              </div>
-            </div>
-            <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 aspect-video bg-blue-50/50 dark:bg-blue-900/10 flex items-center justify-center">
-               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.05),transparent)]" />
-               <motion.div 
-                animate={{ scale: [1, 1.1, 1], rotate: [0, 5, 0] }}
-                transition={{ duration: 5, repeat: Infinity }}
-               >
-                  <Cpu size={100} className="text-blue-500 opacity-20" />
-               </motion.div>
-            </div>
-         </motion.div>
+      <section id="simulation-section" className="relative h-[150vh] flex flex-col items-center justify-center pointer-events-none">
+         {/* The breadboard animation happens over this scroll distance */}
       </section>
 
       {/* Experiments Explorer */}

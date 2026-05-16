@@ -1,6 +1,6 @@
 import React, { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { PerspectiveCamera, Environment, Stars, Sparkles, Trail, QuadraticBezierLine, Float } from '@react-three/drei';
+import { PerspectiveCamera, Environment, Stars, Sparkles, Trail, QuadraticBezierLine, RoundedBox } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import gsap from 'gsap';
@@ -42,51 +42,37 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
   const materialRef1 = useRef<THREE.MeshStandardMaterial>(null);
   const materialRef2 = useRef<THREE.MeshStandardMaterial>(null);
   
-  const ledColor = isLogo ? "#22d3ee" : (index % 2 === 0 ? "#f472b6" : "#fbbf24");
-  const ledEmissive = isLogo ? "#06b6d4" : (index % 2 === 0 ? "#ec4899" : "#f59e0b");
+  const ledColor = "#4ade80";
+  const ledEmissive = "#22c55e";
   const emissiveFactor = isLogo ? 6 : 2;
 
   useFrame((state) => {
-    if (!meshRef.current) return;
     const t = state.clock.getElapsedTime();
     const progress = progressRef ? progressRef.current.value : 0;
     
-    // Lerp wobble magnitude based on progress
-    const baseWobbleY = 0;
-    const baseRotX = 0;
-    const baseRotZ = 0;
-
-    const easeProgress = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-
-    const wobbleY = THREE.MathUtils.lerp(0.5, baseWobbleY, Math.min(1, easeProgress * 1.5));
-    const wobbleX = THREE.MathUtils.lerp(0.5, 0, Math.min(1, easeProgress * 1.5));
-
-    meshRef.current.position.y = Math.sin(t * 2 + index) * wobbleY;
-    meshRef.current.position.x = Math.cos(t * 1.5 + index) * wobbleX;
-    
-    meshRef.current.rotation.x = THREE.MathUtils.lerp(t * 0.5 + index, baseRotX, easeProgress);
-    meshRef.current.rotation.y = THREE.MathUtils.lerp(t * 0.8 + index, 0, easeProgress);
-    meshRef.current.rotation.z = THREE.MathUtils.lerp(t * 0.6 + index, baseRotZ, easeProgress);
-
     // Dynamic color and blinking logic for LEDs
     if (materialRef1.current && materialRef2.current) {
         if (type === 'led') {
-            const blinkSpeed = isLogo ? 3 : 1;
             const timeOffset = index * 0.5;
-            
-            // Randomly blink off
-            const blinkPhase = Math.sin(t * blinkSpeed + timeOffset);
-            const isBlinking = progress > 0.95 && blinkPhase > 0.8;
-            
-            let currentEmissiveIntensity = isBlinking ? 0.0 : THREE.MathUtils.lerp(0.1, emissiveFactor, Math.pow(progress, 4));
+            let currentEmissiveIntensity = THREE.MathUtils.lerp(0.1, emissiveFactor, Math.pow(progress, 4));
 
-            // Slight color shifting
+            // Morph color beautifully when fully formed
             if (progress > 0.9) {
+                // Randomly blink off briefly to look like computation
+                const blinkSpeed = isLogo ? 6 : 4;
+                const blinkPhase = Math.sin(t * blinkSpeed + timeOffset);
+                const isBlinking = blinkPhase > 0.85;
+                if (isBlinking) currentEmissiveIntensity = 0;
+
                 const targetColor = new THREE.Color(ledEmissive);
-                targetColor.offsetHSL(Math.sin(t * 0.5 + index) * 0.05, 0, 0); // shift hue slightly
                 materialRef1.current.emissive.copy(targetColor);
                 materialRef2.current.emissive.copy(targetColor);
-                currentEmissiveIntensity *= (1 + Math.sin(t * 5 + index) * 0.2); // pulse
+                if (!isBlinking) {
+                    currentEmissiveIntensity *= (1 + Math.sin(t * 4 + index) * 0.3); // pulse smoothly
+                }
+            } else {
+                 materialRef1.current.emissive.set(ledEmissive);
+                 materialRef2.current.emissive.set(ledEmissive);
             }
 
             materialRef1.current.emissiveIntensity = currentEmissiveIntensity;
@@ -102,56 +88,72 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
     <group ref={meshRef} position={position} scale={0.8}>
       {type === 'resistor' && (
         <group>
+          {/* Main body: using a capsule for smooth ends */}
           <mesh rotation={[0, 0, Math.PI / 2]}>
-            <capsuleGeometry args={[0.15, 1, 8, 16]} />
-            <meshStandardMaterial color="#fcd34d" roughness={0.3} metalness={0.2} />
+            <capsuleGeometry args={[0.13, 0.6, 16, 16]} />
+            <meshStandardMaterial color="#eacba0" roughness={0.9} />
           </mesh>
-          <mesh rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.2, 0.2, 0.4, 16]} />
-            <meshStandardMaterial color="#c2410c" />
+          {/* Realistic wider end caps */}
+          <mesh position={[-0.35, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+             <cylinderGeometry args={[0.16, 0.16, 0.15, 16]} />
+             <meshStandardMaterial color="#eacba0" roughness={0.9} />
           </mesh>
-          {/* Color bands */}
-          <mesh position={[-0.1, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-             <cylinderGeometry args={[0.21, 0.21, 0.05, 16]} />
+          <mesh position={[0.35, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+             <cylinderGeometry args={[0.16, 0.16, 0.15, 16]} />
+             <meshStandardMaterial color="#eacba0" roughness={0.9} />
+          </mesh>
+          
+          {/* Color bands on the central body */}
+          <mesh position={[-0.15, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+             <cylinderGeometry args={[0.132, 0.132, 0.08, 16]} />
              <meshBasicMaterial color="#b91c1c" />
           </mesh>
-          <mesh position={[0.1, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-             <cylinderGeometry args={[0.21, 0.21, 0.05, 16]} />
-             <meshBasicMaterial color="#a16207" />
+          <mesh position={[0.0, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+             <cylinderGeometry args={[0.132, 0.132, 0.08, 16]} />
+             <meshBasicMaterial color="#ca8a04" />
           </mesh>
+          <mesh position={[0.15, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+             <cylinderGeometry args={[0.132, 0.132, 0.08, 16]} />
+             <meshBasicMaterial color="#1e3a8a" />
+          </mesh>
+          <mesh position={[0.35, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+             {/* Gold tolerance band on the right end cap */}
+             <cylinderGeometry args={[0.162, 0.162, 0.05, 16]} />
+             <meshBasicMaterial color="#d4af37" />
+          </mesh>
+
           {/* leads */}
-          <mesh position={[-0.8, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-             <cylinderGeometry args={[0.02, 0.02, 0.6, 8]} />
-             <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
-          </mesh>
-          <mesh position={[0.8, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-             <cylinderGeometry args={[0.02, 0.02, 0.6, 8]} />
-             <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
-          </mesh>
-        </group>
-      )}
-      {type === 'transistor' && (
-        <group>
-          <mesh position={[0, 0.2, 0]}>
-             <cylinderGeometry args={[0.2, 0.2, 0.4, 16, 1, false, 0, Math.PI]} />
-             <meshStandardMaterial color="#0f172a" roughness={0.9} />
-          </mesh>
-          <mesh position={[0, 0.2, -0.05]}>
-             <boxGeometry args={[0.4, 0.4, 0.1]} />
-             <meshStandardMaterial color="#0f172a" roughness={0.9} />
-          </mesh>
-          <mesh position={[-0.1, -0.2, 0]}>
-             <cylinderGeometry args={[0.02, 0.02, 0.4]} />
-             <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
-          </mesh>
-          <mesh position={[0, -0.2, 0]}>
-             <cylinderGeometry args={[0.02, 0.02, 0.4]} />
-             <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
-          </mesh>
-          <mesh position={[0.1, -0.2, 0]}>
-             <cylinderGeometry args={[0.02, 0.02, 0.4]} />
-             <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
-          </mesh>
+          <group position={[-0.425, 0, 0]}>
+            <mesh position={[-0.2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+               <cylinderGeometry args={[0.02, 0.02, 0.4, 8]} />
+               <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
+            </mesh>
+            <mesh position={[-0.4, -0.25, 0]}>
+               <cylinderGeometry args={[0.02, 0.02, 0.5, 8]} />
+               <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
+            </mesh>
+            {/* The bend joint */}
+            <mesh position={[-0.4, 0, 0]}>
+               <sphereGeometry args={[0.02, 8, 8]} />
+               <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
+            </mesh>
+          </group>
+
+          <group position={[0.425, 0, 0]}>
+            <mesh position={[0.2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+               <cylinderGeometry args={[0.02, 0.02, 0.4, 8]} />
+               <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
+            </mesh>
+            <mesh position={[0.4, -0.25, 0]}>
+               <cylinderGeometry args={[0.02, 0.02, 0.5, 8]} />
+               <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
+            </mesh>
+            {/* The bend joint */}
+            <mesh position={[0.4, 0, 0]}>
+               <sphereGeometry args={[0.02, 8, 8]} />
+               <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
+            </mesh>
+          </group>
         </group>
       )}
       {type === 'led' && (
@@ -182,41 +184,92 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
   );
 }
 
+function BreadboardHoles() {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  
+  const { positions } = useMemo(() => {
+     const cols = 64;
+     const items = [];
+     const startX = -((cols - 1) * 0.3) / 2;
+     
+     // 5 rows top, 5 rows bottom
+     const rows = [-1.8, -1.5, -1.2, -0.9, -0.6, 0.6, 0.9, 1.2, 1.5, 1.8];
+     
+     for (let i = 0; i < cols; i++) {
+        for (let j = 0; j < rows.length; j++) {
+           items.push([startX + i * 0.3, 0, rows[j]]);
+        }
+     }
+     
+     // Power rails
+     const pRows = [-3.2, -2.6, 2.6, 3.2];
+     for (let i = 0; i < cols; i += 2) {
+        for (let j = 0; j < pRows.length; j++) {
+           items.push([startX + i * 0.3, 0, pRows[j]]);
+        }
+     }
+     
+     return { positions: items };
+  }, []);
+
+  useEffect(() => {
+     if (meshRef.current) {
+        const dummy = new THREE.Object3D();
+        positions.forEach((pos, i) => {
+           dummy.position.set(pos[0], pos[1], pos[2]);
+           dummy.rotation.set(-Math.PI / 2, 0, 0);
+           dummy.updateMatrix();
+           meshRef.current?.setMatrixAt(i, dummy.matrix);
+        });
+        meshRef.current.instanceMatrix.needsUpdate = true;
+     }
+  }, [positions]);
+
+  return (
+    <instancedMesh ref={meshRef} args={[undefined, undefined, positions.length]}>
+      <circleGeometry args={[0.07, 8]} />
+      <meshBasicMaterial color="#0f172a" depthWrite={false} />
+    </instancedMesh>
+  );
+}
+
 function Breadboard() {
   return (
-    <group position={[0, 0, 0]}>
+    <group position={[0, -0.25, 0]}>
        {/* Main body */}
-       <mesh>
-         <boxGeometry args={[22, 0.5, 7]} />
-         <meshStandardMaterial color="#cbd5e1" roughness={0.6} />
-       </mesh>
+       <RoundedBox args={[22, 0.8, 8]} radius={0.15} position={[0, 0, 0]}>
+         <meshStandardMaterial color="#f8fafc" roughness={0.4} />
+       </RoundedBox>
+       
        {/* Center Trough */}
-       <mesh position={[0, 0.255, 0]}>
-         <boxGeometry args={[21.5, 0.1, 0.4]} />
-         <meshStandardMaterial color="#94a3b8" />
+       <mesh position={[0, 0.39, 0]}>
+         <boxGeometry args={[21, 0.05, 0.5]} />
+         <meshStandardMaterial color="#e2e8f0" roughness={0.8} />
        </mesh>
-       {/* Power Rails */ /* Top */}
-       <mesh position={[0, 0.255, -2.9]} rotation={[-Math.PI/2, 0, 0]}>
-          <planeGeometry args={[20.5, 0.05]} />
-          <meshBasicMaterial color="#ef4444" opacity={0.6} transparent />
+       
+       {/* Breadboard lines and holes using textures or lines to save perf */}
+       {/* Power Rail Lines */ /* Top */}
+       <mesh position={[0, 0.405, -3.2]} rotation={[-Math.PI/2, 0, 0]}>
+          <planeGeometry args={[20.5, 0.06]} />
+          <meshBasicMaterial color="#ef4444" />
        </mesh>
-       <mesh position={[0, 0.255, -2.3]} rotation={[-Math.PI/2, 0, 0]}>
-          <planeGeometry args={[20.5, 0.05]} />
-          <meshBasicMaterial color="#3b82f6" opacity={0.6} transparent />
+       <mesh position={[0, 0.405, -2.6]} rotation={[-Math.PI/2, 0, 0]}>
+          <planeGeometry args={[20.5, 0.06]} />
+          <meshBasicMaterial color="#3b82f6" />
        </mesh>
-       {/* Power Rails */ /* Bottom */}
-       <mesh position={[0, 0.255, 2.3]} rotation={[-Math.PI/2, 0, 0]}>
-          <planeGeometry args={[20.5, 0.05]} />
-          <meshBasicMaterial color="#3b82f6" opacity={0.6} transparent />
+       {/* Power Rail Lines */ /* Bottom */}
+       <mesh position={[0, 0.405, 2.6]} rotation={[-Math.PI/2, 0, 0]}>
+          <planeGeometry args={[20.5, 0.06]} />
+          <meshBasicMaterial color="#3b82f6" />
        </mesh>
-       <mesh position={[0, 0.255, 2.9]} rotation={[-Math.PI/2, 0, 0]}>
-          <planeGeometry args={[20.5, 0.05]} />
-          <meshBasicMaterial color="#ef4444" opacity={0.6} transparent />
+       <mesh position={[0, 0.405, 3.2]} rotation={[-Math.PI/2, 0, 0]}>
+          <planeGeometry args={[20.5, 0.06]} />
+          <meshBasicMaterial color="#ef4444" />
        </mesh>
        
        {/* Grid representation of holes */}
-       <group position={[0, 0.251, 0]}>
-         <gridHelper args={[21, 84, 0x0f172a, 0x0f172a]} material-opacity={0.3} material-transparent />
+       <group position={[0, 0.405, 0]}>
+         <BreadboardHoles />
        </group>
     </group>
   );
@@ -243,9 +296,9 @@ function BreadboardWires({ logoPoints }: { logoPoints: any[] }) {
         else color = colorDecider > 0.6 ? '#f59e0b' : (colorDecider > 0.3 ? '#10b981' : '#a855f7');
         
         result.push({
-           start: new THREE.Vector3(p1[0], 0.26, p1[1]),
-           end: new THREE.Vector3(p2[0], 0.26, p2[1]),
-           mid: new THREE.Vector3((p1[0]+p2[0])/2, 0.5 + dist * 0.2, (p1[1]+p2[1])/2),
+           start: new THREE.Vector3(p1[0], 0.16, p1[1]),
+           end: new THREE.Vector3(p2[0], 0.16, p2[1]),
+           mid: new THREE.Vector3((p1[0]+p2[0])/2, 0.4 + dist * 0.2, (p1[1]+p2[1])/2),
            color
         });
      }
@@ -267,16 +320,16 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
 
   const logoPoints = useMemo(() => {
     const textLines = [
-      " CCCCC  III  RRRR   CCC U   U III TTTTT    III  QQQQ ",
-      " C       I   R   R C    U   U  I    T       I  Q    Q",
-      " C       I   RRRR  C    U   U  I    T       I  Q    Q",
-      " C       I   R  R  C    U   U  I    T       I  Q  Q Q",
-      " CCCCC  III  R   R  CCC  UUU  III   T    . III  QQQQQ"
+      " CCCCC  III  RRRR   CCC U   U III TTTTT    III   QQQ  ",
+      " C       I   R   R C    U   U  I    T       I   Q   Q ",
+      " C       I   RRRR  C    U   U  I    T       I   Q   Q ",
+      " C       I   R  R  C    U   U  I    T       I   Q  QQ ",
+      " CCCCC  III  R   R  CCC  UUU  III   T    . III   QQQQ "
     ];
     
     const points: [number, number][] = [];
-    const scaleX = 0.4;
-    const scaleZ = 0.6;
+    const scaleX = 0.35;
+    const scaleZ = 0.5;
     const offsetX = (textLines[0].length * scaleX) / 2;
     const offsetZ = (textLines.length * scaleZ) / 2;
     
@@ -292,17 +345,17 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
     const used = new Set<string>();
     points.forEach(p => used.add(`${p[0].toFixed(2)},${p[1].toFixed(2)}`));
     
-    for(let i=0; i<250; i++) {
+    for(let i=0; i<15; i++) {
         const snap = (v: number) => Math.round(v * 2) / 2;
-        let x = snap((Math.random() - 0.5)*20);
-        let z = snap((Math.random() - 0.5)*5);
+        let x = snap((Math.random() - 0.5)*19);
+        let z = snap((Math.random() - 0.5)*4.5);
         if (z === 0) z = 0.5;
         let key = `${x.toFixed(2)},${z.toFixed(2)}`;
         let tries = 0;
         
         while (used.has(key) && tries < 10) {
-            x = snap((Math.random() - 0.5)*20);
-            z = snap((Math.random() - 0.5)*5);
+            x = snap((Math.random() - 0.5)*19);
+            z = snap((Math.random() - 0.5)*4.5);
             if (z === 0) z = 0.5;
             key = `${x.toFixed(2)},${z.toFixed(2)}`;
             tries++;
@@ -316,13 +369,14 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
 
   const components = useMemo(() => {
     return logoPoints.map((item, i) => {
-      const type = item.isLogo ? 'led' : (Math.random() > 0.5 ? 'resistor' : 'transistor');
+      const type = item.isLogo ? 'led' : 'resistor';
       
       const swirlRadius = 8 + Math.random() * 30; // Wider spread
       const swirlAngle = Math.random() * Math.PI * 2;
       const swirlY = 10 + (Math.random() - 0.5) * 40; // Taller spread
       const swirlOrbitSpeed = (Math.random() - 0.5) * 0.4;
       const swirlVertSpeed = (Math.random() - 0.5) * 0.2;
+      const randomRotY = 0; // Keep resistors perfectly straight
       
       const endPos: [number, number, number] = [
         item.p[0],
@@ -337,7 +391,7 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
       return { 
         type, id: i, delay: Math.random(), 
         swirlRadius, swirlAngle, swirlY, swirlOrbitSpeed, swirlVertSpeed, endPos,
-        isLogo: item.isLogo, crazyX, crazyY, crazyZ
+        isLogo: item.isLogo, crazyX, crazyY, crazyZ, randomRotY
       };
     });
   }, [logoPoints]);
@@ -350,9 +404,9 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
       value: 1,
       scrollTrigger: {
         trigger: "#simulation-section",
-        start: "top center",
+        start: "top bottom",
         end: "center center",
-        scrub: 1,
+        scrub: 0.2,
       }
     });
 
@@ -366,9 +420,9 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
           rotationX: 0,
           scrollTrigger: {
             trigger: "#simulation-section",
-            start: "top center",
+            start: "top bottom",
             end: "center center",
-            scrub: 1,
+            scrub: 0.2,
           }
         }
       );
@@ -395,39 +449,51 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
 
       // End Rotations
       let eRotX = 0;
-      let eRotY = comp.isLogo ? 0 : Math.random() * Math.PI * 0.2;
-      let eRotZ = comp.type === 'resistor' ? Math.PI / 2 : 0;
+      let eRotY = comp.isLogo ? 0 : comp.randomRotY;
+      let eRotZ = 0; // Resistors horizontal to show plugged into breadboard
 
-      // Smooth easing curve
-      let easeProgress = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+      // Unique assembly animation logic
+      const distToCenter = Math.sqrt(comp.endPos[0]*comp.endPos[0] + comp.endPos[2]*comp.endPos[2]);
+      const leftToRight = Math.max(0, Math.min(1, (comp.endPos[0] + 10) / 20)); // 0 to 1 based on X pos
+      const waveOffset = leftToRight * 0.2; // sweeping wave from left to right
+      let delayedProgress = Math.max(0, Math.min(1, (progress - waveOffset) / (1 - waveOffset)));
+      
+      // Bouncy easing for assembling
+      let rawEase = delayedProgress === 1 ? 1 : (delayedProgress < 0.5 ? 4 * delayedProgress * delayedProgress * delayedProgress : 1 - Math.pow(-2 * delayedProgress + 2, 3) / 2);
+      
+      // Snap to 1 early to prevent micro-jiggles and vibration when near the end of the scroll
+      let easeProgress = rawEase > 0.95 ? 1 : rawEase;
 
       let targetX = comp.endPos[0];
       let targetY = comp.endPos[1];
       let targetZ = comp.endPos[2];
 
-      if (comp.isLogo && progress > 0.3 && progress < 0.95) {
-          // Crazy scramble before settling
-          const intensity = Math.sin((progress - 0.3) * Math.PI / 0.65); // peaks around 0.6
-          targetX += comp.crazyX * intensity;
-          targetY += Math.abs(comp.crazyY * intensity); // bounce upwards
-          targetZ += comp.crazyZ * intensity;
-          
-          eRotX += comp.crazyX * intensity;
-          eRotY += comp.crazyY * intensity;
-          eRotZ += comp.crazyZ * intensity;
-
-          easeProgress += (Math.sin(t * 15 + comp.id) * 0.15 * intensity); // jitter
+      // Make them drop and pop subtly
+      if (delayedProgress > 0.0 && delayedProgress < 1.0) {
+           // Smoothly fade the intensity to strictly 0 as delayedProgress hits 1
+           const hoverIntensity = Math.sin(delayedProgress * Math.PI) * 0.5;
+           targetY += hoverIntensity * 5; // fly higher before dropping
+           
+           // Flip subtly while dropping
+           const rotIntensity = Math.sin(delayedProgress * Math.PI);
+           eRotX += rotIntensity * Math.PI * 0.25;
+           eRotY += rotIntensity * Math.PI * 0.5;
       }
 
-      // Interpolate
-      mesh.position.x = THREE.MathUtils.lerp(sx, targetX, Math.max(0, Math.min(1, easeProgress)));
-      mesh.position.y = THREE.MathUtils.lerp(sy, targetY, Math.max(0, Math.min(1, easeProgress)));
-      mesh.position.z = THREE.MathUtils.lerp(sz, targetZ, Math.max(0, Math.min(1, easeProgress)));
+      if (easeProgress >= 0.999) {
+          mesh.position.set(targetX, targetY, targetZ);
+          mesh.rotation.set(eRotX, eRotY, eRotZ);
+      } else {
+          // Interpolate
+          mesh.position.x = THREE.MathUtils.lerp(sx, targetX, easeProgress);
+          mesh.position.y = THREE.MathUtils.lerp(sy, targetY, easeProgress);
+          mesh.position.z = THREE.MathUtils.lerp(sz, targetZ, easeProgress);
 
-      // Simple rotation lerp
-      mesh.rotation.x = THREE.MathUtils.lerp(sRotX, eRotX, easeProgress);
-      mesh.rotation.y = THREE.MathUtils.lerp(sRotY, eRotY, easeProgress);
-      mesh.rotation.z = THREE.MathUtils.lerp(sRotZ, eRotZ, easeProgress);
+          // Simple rotation lerp
+          mesh.rotation.x = THREE.MathUtils.lerp(sRotX, eRotX, easeProgress);
+          mesh.rotation.y = THREE.MathUtils.lerp(sRotY, eRotY, easeProgress);
+          mesh.rotation.z = THREE.MathUtils.lerp(sRotZ, eRotZ, easeProgress);
+      }
     });
   });
 
@@ -461,20 +527,20 @@ function Rig({ progressRef }: { progressRef: React.MutableRefObject<{value: numb
     const t = clock.getElapsedTime() * 0.2; 
     
     // When swirling, orbit widely. When settled, lock to front-ish view for readability.
-    const idealOrbitX = Math.sin(t) * 28;
-    const idealOrbitZ = Math.cos(t) * 28;
-    const idealOrbitY = 12;
+    const idealOrbitX = Math.sin(t) * 35;
+    const idealOrbitZ = Math.cos(t) * 35;
+    const idealOrbitY = 18;
 
     const settledCamX = 0;
     const settledCamY = 14;
-    const settledCamZ = 12;
+    const settledCamZ = 10;
 
     const baseCamX = THREE.MathUtils.lerp(idealOrbitX, settledCamX, progress);
     const baseCamY = THREE.MathUtils.lerp(idealOrbitY, settledCamY, progress);
     const baseCamZ = THREE.MathUtils.lerp(idealOrbitZ, settledCamZ, progress);
 
-    const mouseMultX = THREE.MathUtils.lerp(30, 2, progress);
-    const mouseMultY = THREE.MathUtils.lerp(25, 1, progress);
+    const mouseMultX = THREE.MathUtils.lerp(30, 0.5, progress); // lower mouse influence when settled
+    const mouseMultY = THREE.MathUtils.lerp(25, 0.5, progress);
     
     const targetX = baseCamX + mouse.x * mouseMultX;
     const targetY = baseCamY + mouse.y * mouseMultY;
@@ -495,8 +561,8 @@ export default function AntigravityHero() {
            opacity: 0,
            scrollTrigger: {
               trigger: "#simulation-section",
-              start: "bottom center",
-              end: "bottom top",
+              start: "bottom bottom",
+              end: "bottom center",
               scrub: true,
            }
         });
