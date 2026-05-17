@@ -345,7 +345,7 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
     const used = new Set<string>();
     points.forEach(p => used.add(`${p[0].toFixed(2)},${p[1].toFixed(2)}`));
     
-    for(let i=0; i<15; i++) {
+    for(let i=0; i<5; i++) {
         const snap = (v: number) => Math.round(v * 2) / 2;
         let x = snap((Math.random() - 0.5)*19);
         let z = snap((Math.random() - 0.5)*4.5);
