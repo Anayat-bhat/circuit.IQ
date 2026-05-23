@@ -226,7 +226,7 @@ function TeamMemberCard({ member, index, isSelected, onClickPlay, onClose }: Car
       viewport={{ once: true, margin: "-100px" }}
       // Staggered quantum gravity float representation (cards bob up and down asynchronously to look beautiful)
       animate={isSelected ? { y: 0, scale: 1.01 } : {
-        y: [0, -10, 0],
+        y: [0, -8, 0],
       }}
       transition={isSelected ? { duration: 0.3 } : {
         y: {
@@ -240,17 +240,17 @@ function TeamMemberCard({ member, index, isSelected, onClickPlay, onClose }: Car
         rotateX: isSelected ? 0 : rotateX, 
         rotateY: isSelected ? 0 : rotateY, 
         transformStyle: "preserve-3d",
-        perspective: "1250px"
+        perspective: "1000px"
       }}
-      // scaled size to satisfy user request ("make boxes little bit big")
-      className={`w-[410px] md:w-[470px] aspect-[12/15] rounded-[36px] bg-slate-950 border border-slate-900 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95)] transition-all duration-500 relative overflow-hidden flex flex-col justify-between group cursor-pointer p-10 select-none ${getGlowBorderColor()} ${isSelected ? 'ring-2 ring-blue-500/40 border-blue-500/30' : ''}`}
+      // scaled size to satisfy user request ("make boxes smaller to prevent overlap")
+      className={`w-[305px] md:w-[340px] aspect-[11/14] rounded-[28px] bg-slate-950 border border-slate-900 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.92)] transition-all duration-500 relative overflow-hidden flex flex-col justify-between group cursor-pointer p-7 select-none ${getGlowBorderColor()} ${isSelected ? 'ring-2 ring-blue-500/30 border-blue-500/20' : ''}`}
     >
       {/* Background radial tracking spotlight */}
       <div 
-        className="absolute inset-0 pointer-events-none transition-opacity duration-500 rounded-[36px] z-10"
+        className="absolute inset-0 pointer-events-none transition-opacity duration-500 rounded-[28px] z-10"
         style={{
           opacity: spotlight.opacity,
-          background: `radial-gradient(450px circle at ${spotlight.posX}px ${spotlight.posY}px, ${getGlowColor()}, transparent 100%)`
+          background: `radial-gradient(350px circle at ${spotlight.posX}px ${spotlight.posY}px, ${getGlowColor()}, transparent 100%)`
         }}
       />
 
@@ -363,24 +363,24 @@ function TeamMemberCard({ member, index, isSelected, onClickPlay, onClose }: Car
             className="w-full h-full flex flex-col justify-between"
           >
             {/* Play trigger overlay designed specifically for smooth mouse captures */}
-            <div className="absolute inset-0 flex items-center justify-center z-20 bg-slate-950/65 opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-[4px] rounded-[36px]">
-              <div className="flex flex-col items-center gap-4">
+            <div className="absolute inset-0 flex items-center justify-center z-20 bg-slate-950/65 opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-[3px] rounded-[28px]">
+              <div className="flex flex-col items-center gap-3">
                 <motion.div 
                   onClick={(e) => {
                     e.stopPropagation();
                     onClickPlay();
                   }}
-                  animate={hovered ? { scale: [1, 1.15, 1], rotate: [0, 5, -5, 0] } : {}}
+                  animate={hovered ? { scale: [1, 1.1, 1], rotate: [0, 4, -4, 0] } : {}}
                   transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                  className="w-16 h-16 rounded-full bg-white/10 hover:bg-white/20 border border-white/25 backdrop-blur-xl flex items-center justify-center shadow-2xl shadow-black/80 ring-4 ring-white/5 cursor-pointer hover:scale-110 active:scale-95 transition-all"
+                  className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 backdrop-blur-xl flex items-center justify-center shadow-xl shadow-black/80 ring-2 ring-white/5 cursor-pointer hover:scale-105 active:scale-95 transition-all"
                 >
-                  <Play className="w-6 h-6 text-white fill-white translate-x-[2px]" />
+                  <Play className="w-5 h-5 text-white fill-white translate-x-[1.5px]" />
                 </motion.div>
                 <motion.span 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={hovered ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={hovered ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
                   transition={{ duration: 0.3, delay: 0.1 }}
-                  className="text-[10px] font-mono font-bold tracking-widest text-white px-3.5 py-1 bg-white/5 rounded-full border border-white/10 shadow-lg tracking-widest"
+                  className="text-[9px] font-mono font-bold tracking-widest text-white px-2.5 py-0.5 bg-white/5 rounded-full border border-white/10 shadow-md"
                 >
                   PLAY PROTOTYPE DEMO
                 </motion.span>
@@ -388,33 +388,33 @@ function TeamMemberCard({ member, index, isSelected, onClickPlay, onClose }: Car
             </div>
 
             {/* Header layout containing Roles */}
-            <div className="relative z-20 flex justify-between items-start transition-transform duration-350" style={{ transform: hovered ? "translateZ(50px) scale(1.02)" : "translateZ(20px)" }}>
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-slate-900/90 border border-slate-800/80 flex items-center justify-center shadow-xl group-hover:border-slate-500/30 transition-colors duration-300">
+            <div className="relative z-20 flex justify-between items-start transition-transform duration-350" style={{ transform: hovered ? "translateZ(25px)" : "translateZ(10px)" }}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-900/90 border border-slate-800/80 flex items-center justify-center shadow-md group-hover:border-slate-500/20 transition-colors duration-300">
                   {member.icon}
                 </div>
                 <div className="text-left">
-                  <span className="text-[9.5px] font-mono font-bold uppercase text-slate-500 tracking-wider">TEAM FOUNDER</span>
-                  <div className="text-xs font-mono font-black text-slate-300 tracking-wide mt-0.5 group-hover:text-white transition-all">{member.role}</div>
+                  <span className="text-[8.5px] font-mono font-bold uppercase text-slate-500 tracking-wider">TEAM FOUNDER</span>
+                  <div className="text-[11px] font-mono font-bold text-slate-300 tracking-wide mt-0.5 group-hover:text-white transition-all">{member.role}</div>
                 </div>
               </div>
             </div>
 
             {/* Bottom Panel containing titles, specs and detailed descriptions */}
-            <div className="relative z-20 space-y-4 transition-transform duration-350" style={{ transform: hovered ? "translateZ(65px)" : "translateZ(20px)" }}>
+            <div className="relative z-20 space-y-3 transition-transform duration-350" style={{ transform: hovered ? "translateZ(35px)" : "translateZ(10px)" }}>
               {/* Specialized tag stack */}
-              <div className="flex flex-wrap gap-1.5 pt-4">
+              <div className="flex flex-wrap gap-1">
                 {member.specs.map((spec, i) => (
-                  <span key={i} className="text-[8px] font-mono bg-white/5 text-slate-500 px-2 py-0.5 rounded-full border border-white/5">
+                  <span key={i} className="text-[7.5px] font-mono bg-white/5 text-slate-500 px-2 py-0.5 rounded-full border border-white/5">
                     {spec}
                   </span>
                 ))}
               </div>
 
-              <h3 className="text-2xl md:text-3xl font-extrabold font-display text-white tracking-tight group-hover:text-amber-400 transition-colors duration-200 text-left leading-tight">
+              <h3 className="text-lg md:text-xl font-bold font-display text-white tracking-tight group-hover:text-amber-400 transition-colors duration-200 text-left leading-tight">
                 {member.title}
               </h3>
-              <p className="text-xs md:text-sm text-slate-400 leading-relaxed font-light group-hover:text-slate-200 transition-colors duration-300 text-left">
+              <p className="text-[11px] text-slate-400 leading-relaxed font-light group-hover:text-slate-200 transition-colors duration-300 text-left">
                 {member.description}
               </p>
             </div>
