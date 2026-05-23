@@ -1,6 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
 import AntigravityHero from '../components/AntigravityHero';
+import PhysicsWavyRibbon from '../components/PhysicsWavyRibbon';
+import PhysicsShowcase from '../components/PhysicsShowcase';
+import TeamRolesSection from '../components/TeamRolesSection';
 import { useAppStore } from '../store/useAppStore';
 import { Zap, Cpu, MousePointer2, FlaskConical } from 'lucide-react';
 import Lenis from 'lenis';
@@ -96,19 +99,26 @@ export default function LandingPage() {
          {/* The breadboard animation happens over this scroll distance */}
       </section>
 
-      {/* Experiments Explorer */}
-      <section className="relative px-6 py-32 max-w-7xl mx-auto">
-          <div className="text-center mb-20">
-            <h2 className="text-5xl font-display font-bold mb-4 text-slate-900 dark:text-white">Physics Domains</h2>
-            <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">Explore our extensive library of interactive physics experiments designed for students and enthusiasts.</p>
+      {/* Experiments Explorer Section with Wavy Ribbon stretching 100% full screen width */}
+      <section className="relative py-32 w-full overflow-hidden">
+          <div className="w-full mb-16">
+              <PhysicsWavyRibbon />
           </div>
+          
+          <div className="max-w-7xl mx-auto px-6">
+              <div className="text-center mb-20">
+                <h2 className="text-5xl font-display font-bold mb-4 text-slate-900 dark:text-white">Physics Domains</h2>
+                <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">Explore our extensive library of interactive physics experiments designed for students and enthusiasts.</p>
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <CategoryCard title="Electricity & Circuits" icon={<Zap size={32}/>} items={["Ohm's Law", "KVL & KCL", "RLC Circuits"]} />
-            <CategoryCard title="Optics & Light" icon={<FlaskConical size={32}/>} items={["Snell's Law", "Prism Dispersion", "Ideal Lens"]} />
-            <CategoryCard title="Modern Physics" icon={<Cpu size={32}/>} items={["Photoelectric Effect", "Bohr Model", "Boyle's Law"]} />
+              <div className="mt-16">
+                <PhysicsShowcase />
+              </div>
           </div>
       </section>
+
+      {/* Team Roles / Founders Showcase */}
+      <TeamRolesSection />
 
       {/* Lab CTA */}
       <section className="py-32 flex flex-col items-center justify-center text-center">

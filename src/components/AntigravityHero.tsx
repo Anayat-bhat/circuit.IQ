@@ -1,6 +1,6 @@
 import React, { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { PerspectiveCamera, Environment, Stars, Sparkles, Trail, QuadraticBezierLine, RoundedBox } from '@react-three/drei';
+import { PerspectiveCamera, Environment, Stars, Sparkles, Trail, QuadraticBezierLine, RoundedBox, OrbitControls } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import gsap from 'gsap';
@@ -314,6 +314,70 @@ function BreadboardWires({ logoPoints }: { logoPoints: any[] }) {
   );
 }
 
+function PhysicsBackgroundItems() {
+  const items = useMemo(() => {
+    return Array.from({ length: 45 }).map((_, i) => {
+      const type = Math.random() > 0.5 ? 'led' : 'resistor';
+      const radius = 22 + Math.random() * 32;
+      const angle = Math.random() * Math.PI * 2;
+      const y = (Math.random() - 0.5) * 45;
+      
+      return {
+        id: i,
+        type,
+        position: [
+          Math.cos(angle) * radius,
+          y,
+          Math.sin(angle) * radius
+        ] as [number, number, number],
+        rotation: [Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI] as [number, number, number],
+        scale: 0.6 + Math.random() * 0.7,
+        speed: {
+           rotX: (Math.random() - 0.5) * 0.4,
+           rotY: (Math.random() - 0.5) * 0.4,
+           rotZ: (Math.random() - 0.5) * 0.4,
+           orbit: (Math.random() - 0.5) * 0.08,
+           yOffset: Math.random() * Math.PI * 2,
+           yFreq: 0.12 + Math.random() * 0.3
+        }
+      };
+    });
+  }, []);
+
+  const groupRef = useRef<THREE.Group>(null);
+  
+  useFrame((state) => {
+     const t = state.clock.getElapsedTime();
+     if (groupRef.current) {
+        groupRef.current.children.forEach((child, i) => {
+           const item = items[i];
+           if (!item) return;
+           
+           child.rotation.x += item.speed.rotX * 0.04;
+           child.rotation.y += item.speed.rotY * 0.04;
+           child.rotation.z += item.speed.rotZ * 0.04;
+           
+           const currentRadius = Math.sqrt(item.position[0]*item.position[0] + item.position[2]*item.position[2]);
+           const currentAngle = Math.atan2(item.position[2], item.position[0]) + t * item.speed.orbit;
+           
+           child.position.x = Math.cos(currentAngle) * currentRadius;
+           child.position.z = Math.sin(currentAngle) * currentRadius;
+           child.position.y = item.position[1] + Math.sin(t * item.speed.yFreq + item.speed.yOffset) * 4;
+        });
+     }
+  });
+
+  return (
+    <group ref={groupRef}>
+       {items.map((item) => (
+         <group key={item.id} position={item.position} rotation={item.rotation} scale={item.scale}>
+            <FloatingComponent position={[0, 0, 0]} type={item.type} index={item.id} delay={0} isLogo={false} />
+         </group>
+       ))}
+    </group>
+  );
+}
+
 function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{value: number}> }) {
   const breadboardRef = useRef<THREE.Group>(null);
   const containerRef = useRef<THREE.Group>(null);
@@ -579,6 +643,7 @@ export default function AntigravityHero() {
         <pointLight position={[10, 5, 10]} intensity={1} color="#fcf0d5" />
         
         <CursorGlitter />
+        <PhysicsBackgroundItems />
         <GridLogoScene progressRef={progressRef} />
         <Rig progressRef={progressRef} />
         <Environment preset="night" />
