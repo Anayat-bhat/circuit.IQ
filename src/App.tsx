@@ -28,7 +28,7 @@ export default function App() {
       <div className="glow-top-left" />
       <div className="glow-bottom-right" />
       
-      <Navbar />
+      {!isLabOpen && <Navbar />}
       
       <AnimatePresence mode="wait">
         {!isLabOpen ? (

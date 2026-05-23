@@ -1,0 +1,1832 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LabPro | AI-Powered Virtual Physics Laboratory</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    
+    <!-- GSAP & Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                        display: ['Playfair Display', 'serif'],
+                    },
+                    colors: {
+                        brand: {
+                            dark: '#0a0a0a',
+                            panel: 'rgba(15, 15, 15, 0.85)',
+                            border: 'rgba(212, 175, 55, 0.2)',
+                            accent: '#d4af37',
+                            glow: '#fcd34d'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* ==========================================
+           GLOBAL SETUP
+           ========================================== */
+        :root {
+            --brand-panel: rgba(15, 15, 15, 0.85);
+            --brand-border: rgba(212, 175, 55, 0.2);
+            --gold: #d4af37;
+            --gold-glow: rgba(212, 175, 55, 0.15);
+        }
+        body { background-color: #0a0a0a; color: #f8fafc; overflow-x: hidden; margin: 0; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #d4af37; }
+
+        .glass {
+            background: var(--brand-panel);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--brand-border);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+        .text-gradient {
+            background: linear-gradient(to right, #d4af37, #fde68a, #d4af37);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* ==========================================
+           APP VIEW
+           ========================================== */
+        #app-view {
+            display: none; height: 100vh; width: 100vw;
+            flex-direction: column; position: fixed;
+            top: 0; left: 0; z-index: 1000; background: #0a0a0a;
+        }
+        #topbar { height: 60px; z-index: 100; border-bottom: 1px solid var(--brand-border); flex-shrink:0; }
+        #main-lab { flex: 1; display: flex; overflow: hidden; position: relative; }
+        .side-panel { width: 320px; display: flex; flex-direction: column; overflow-y: auto; z-index: 10; flex-shrink:0; }
+        #left-panel { border-right: 1px solid var(--brand-border); background: linear-gradient(to right, rgba(10,10,10,0.97), rgba(15,15,15,0.85)); }
+        #right-panel { border-left: 1px solid var(--brand-border); background: linear-gradient(to left, rgba(10,10,10,0.97), rgba(15,15,15,0.85)); }
+        #canvas-wrap { flex: 1; position: relative; background: #050505; overflow:hidden; }
+        #three-canvas { display: block; width: 100%; height: 100%; outline: none; }
+        #bottom-bar { height: 44px; border-top: 1px solid var(--brand-border); background: rgba(8,8,8,0.95); display:flex; align-items:center; padding: 0 16px; gap: 16px; flex-shrink:0; z-index:100; }
+
+        /* ==========================================
+           UI COMPONENTS
+           ========================================== */
+        .section-title { font-size: 10px; font-weight: 700; letter-spacing: 3px; color: #6b7280; text-transform: uppercase; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 6px; }
+        
+        .comp-btn {
+            display: flex; align-items: center; gap: 12px; padding: 11px 12px;
+            border-radius: 6px; cursor: pointer; border: 1px solid transparent;
+            margin-bottom: 8px; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(20, 20, 20, 0.6); position: relative; overflow:hidden;
+        }
+        .comp-btn::before { content:''; position:absolute; inset:0; background: linear-gradient(135deg, transparent 60%, rgba(212,175,55,0.03)); pointer-events:none; }
+        .comp-btn:hover { background: rgba(35, 35, 35, 0.9); transform: translateX(4px); border-color: rgba(255,255,255,0.08); }
+        .comp-btn.selected { border-color: #d4af37; background: rgba(212, 175, 55, 0.06); box-shadow: inset 2px 0 0 #d4af37, 0 0 20px rgba(212,175,55,0.08); }
+        .comp-btn.dimmed { opacity: 0.3; pointer-events: none; }
+        .comp-icon { width: 36px; height: 36px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.06); }
+
+        /* Meters */
+        .meter-container { background: #000; border: 1px solid #1a1a1a; border-radius: 6px; padding: 12px 14px; margin-bottom: 10px; position: relative; overflow: hidden; }
+        .meter-container::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 25%; background: linear-gradient(rgba(255,255,255,0.02), transparent); pointer-events: none; }
+        .meter-header { display: flex; justify-content: space-between; margin-bottom: 4px; color: #4b5563; font-size: 9px; font-weight: bold; letter-spacing: 1.5px; }
+        .meter-val { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 700; letter-spacing:-1px; transition: all 0.1s; }
+        .meter-unit { font-size: 10px; color: #6b7280; font-weight: 400; letter-spacing:0; }
+        .val-v { color: #f87171; text-shadow: 0 0 15px rgba(248,113,113,0.4); }
+        .val-a { color: #60a5fa; text-shadow: 0 0 15px rgba(96,165,250,0.4); }
+        .val-o { color: #34d399; text-shadow: 0 0 15px rgba(52,211,153,0.4); }
+        .meter-bar { height: 2px; background: #111; border-radius: 2px; margin-top: 8px; overflow: hidden; }
+        .meter-bar-fill { height: 100%; border-radius: 2px; transition: width 0.2s ease; }
+
+        /* Sliders */
+        input[type=range] { width: 100%; -webkit-appearance: none; height: 2px; border-radius: 2px; background: #222; outline: none; margin-top: 8px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #0a0a0a; cursor: pointer; border: 2px solid #d4af37; transition: all 0.15s; box-shadow: 0 0 8px rgba(212,175,55,0.3); }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.25); background: #d4af37; }
+
+        /* AI Agent */
+        #ai-agent {
+            position: absolute; bottom: 24px; left: 24px; max-width: 380px;
+            z-index: 50; transform-origin: bottom left;
+        }
+        .ai-avatar {
+            width: 48px; height: 48px; border-radius: 50%;
+            background: linear-gradient(135deg, #1f2937, #000000);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 25px rgba(212, 175, 55, 0.2); border: 2px solid #d4af37;
+            flex-shrink: 0;
+        }
+        .ai-avatar i { font-size: 20px; color: #d4af37; animation: float 4s ease-in-out infinite; }
+
+        /* Graph */
+        #graph-canvas { width: 100%; border-radius: 4px; display: block; }
+
+        /* Tabs */
+        .panel-tab { cursor: pointer; padding: 6px 12px; font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #4b5563; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap; }
+        .panel-tab.active { color: #d4af37; border-bottom-color: #d4af37; }
+        .panel-content { display: none; }
+        .panel-content.active { display: block; }
+
+        /* Wire Mode Badge */
+        #wire-mode-badge {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            display: none; z-index: 50; background: rgba(0,0,0,0.9); border: 1px solid #d4af37;
+            padding: 8px 20px; border-radius: 4px; white-space: nowrap;
+        }
+
+        /* Overlay loader */
+        #overlay-loader { position: absolute; inset: 0; background: #050505; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; transition: opacity 0.8s ease; }
+        #overlay-loader.hidden { opacity: 0; pointer-events: none; }
+
+        /* Oscilloscope */
+        #osc-canvas { background: #000c00; border-radius: 4px; display: block; width: 100%; }
+
+        /* Experiment steps */
+        .step-item { display:flex; gap:10px; align-items:flex-start; padding:8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .step-num { width:20px; height:20px; border-radius:50%; background:#111; border:1px solid #333; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:#666; flex-shrink:0; margin-top:1px; }
+        .step-num.done { background: rgba(212,175,55,0.15); border-color: #d4af37; color: #d4af37; }
+        .step-num.current { background: rgba(212,175,55,0.1); border-color: #d4af37; color: #d4af37; animation: pulse-step 1.5s infinite; }
+        .step-text { font-size: 11px; color: #9ca3af; line-height: 1.5; }
+        .step-item.current .step-text { color: #e5e7eb; }
+
+        /* Data table */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        .data-table th { text-align: left; padding: 6px 8px; color: #6b7280; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid #1f1f1f; }
+        .data-table td { padding: 5px 8px; color: #d1d5db; border-bottom: 1px solid #0f0f0f; font-family: 'JetBrains Mono', monospace; }
+        .data-table tr:hover td { background: rgba(212,175,55,0.03); }
+
+        /* Score */
+        .score-ring { stroke-dasharray: 157; stroke-dashoffset: 157; transition: stroke-dashoffset 1s ease; }
+
+        /* Notification */
+        #notification { position: absolute; top: 16px; right: 16px; z-index:200; pointer-events:none; }
+        .notif { padding: 10px 16px; border-radius: 4px; font-size: 11px; font-weight: 600; letter-spacing: 1px; margin-bottom: 8px; transform: translateX(120%); transition: transform 0.4s cubic-bezier(0.2,0.8,0.2,1); display:flex; align-items:center; gap:8px; }
+        .notif.show { transform: translateX(0); }
+        .notif.success { background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3); color: #34d399; }
+        .notif.error { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); color: #f87171; }
+        .notif.info { background: rgba(212,175,55,0.1); border: 1px solid rgba(212,175,55,0.3); color: #d4af37; }
+
+        /* Keyboard shortcut badge */
+        .kbd { display:inline-flex; align-items:center; padding:1px 5px; background:#111; border:1px solid #333; border-radius:3px; font-size:9px; color:#666; font-family:monospace; }
+
+        /* ==========================================
+           ANIMATIONS
+           ========================================== */
+        @keyframes popIn { from { opacity: 0; transform: scale(0.95) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.4); } 70% { box-shadow: 0 0 0 12px rgba(212, 175, 55, 0); } 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); } }
+        @keyframes pulse-step { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes slideIn { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: translateY(0); } }
+        @keyframes scanline { from { transform: translateY(-100%); } to { transform: translateY(200%); } }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+        @keyframes spin-slow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+    </style>
+</head>
+<body>
+
+    <!-- =======================================================
+         APP VIEW
+         ======================================================= -->
+    <div id="app-view">
+        <div id="overlay-loader">
+            <div class="w-16 h-16 border-4 border-yellow-600/20 border-t-yellow-500 rounded-full animate-spin mb-8"></div>
+            <h2 class="font-display text-3xl font-bold tracking-[0.2em] mb-3 text-white">CALIBRATING</h2>
+            <p class="text-xs text-gray-500 font-mono tracking-widest uppercase">Rendering Photorealistic Environment...</p>
+        </div>
+
+        <!-- TOP BAR -->
+        <div id="topbar" class="glass flex items-center justify-between px-6">
+            <div class="flex items-center gap-5">
+                <div class="w-9 h-9 rounded border border-yellow-500/30 bg-black flex items-center justify-center">
+                    <i class="fa-solid fa-bolt text-yellow-500 text-xs"></i>
+                </div>
+                <div class="font-display font-bold tracking-widest text-base uppercase">Circuit<span class="text-yellow-600">.IQ</span></div>
+                <div class="w-px h-6 bg-white/10"></div>
+                <select id="exp-selector" class="bg-black border border-white/10 text-gray-300 text-xs font-mono font-bold tracking-wider rounded px-3 py-1.5 outline-none focus:border-yellow-500 transition cursor-pointer">
+                    <option value="ohms">EXP-01: OHM'S LAW (DC)</option>
+                    <option value="lcr">EXP-02: SERIES LCR (AC)</option>
+                    <option value="rc">EXP-03: RC TIME CONSTANT</option>
+                </select>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <!-- Score -->
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-black/50 rounded border border-white/5">
+                    <i class="fa-solid fa-star text-yellow-500 text-xs"></i>
+                    <span class="text-xs font-mono text-gray-400">Score: <span id="score-display" class="text-yellow-500 font-bold">0</span></span>
+                </div>
+                <!-- AI Toggle -->
+                <button id="btn-ai-toggle" class="px-4 py-1.5 rounded text-xs font-bold tracking-widest uppercase text-emerald-400 hover:bg-emerald-500/10 transition flex items-center gap-2 border border-emerald-500/20">
+                    <i class="fa-solid fa-microchip"></i> AI
+                </button>
+                <!-- Graph Toggle -->
+                <button id="btn-graph-toggle" class="px-4 py-1.5 rounded text-xs font-bold tracking-widest uppercase text-blue-400 hover:bg-blue-500/10 transition flex items-center gap-2 border border-blue-500/20">
+                    <i class="fa-solid fa-chart-line"></i> Graph
+                </button>
+                <button class="px-4 py-2 rounded text-xs font-bold tracking-widest uppercase text-gray-400 hover:text-white hover:bg-white/5 transition flex items-center gap-2 border border-transparent hover:border-white/10" id="btn-reset">
+                    <i class="fa-solid fa-eraser text-gray-500"></i> Clear
+                </button>
+                <button class="px-5 py-2 rounded text-xs font-bold tracking-widest uppercase bg-yellow-600 text-black hover:bg-yellow-500 shadow-[0_0_20px_rgba(212,175,55,0.2)] transition flex items-center gap-2" id="btn-run">
+                    <i class="fa-solid fa-power-off"></i> Initialize
+                </button>
+                <div class="w-px h-5 bg-white/10"></div>
+                <!-- Exit button signals parent via message -->
+                <button class="w-9 h-9 flex items-center justify-center rounded text-gray-500 hover:text-red-500 hover:bg-red-500/10 transition" onclick="closeLab()" title="Exit">
+                    <i class="fa-solid fa-right-from-bracket text-sm"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- MAIN WORKSPACE -->
+        <div id="main-lab">
+            
+            <!-- LEFT PANEL -->
+            <div id="left-panel" class="side-panel glass">
+                <!-- Panel Tabs -->
+                <div class="flex border-b border-white/5 px-4 pt-4 gap-0 overflow-x-auto">
+                    <div class="panel-tab active" data-panel="components">Parts</div>
+                    <div class="panel-tab" data-panel="procedure">Steps</div>
+                    <div class="panel-tab" data-panel="theory">Theory</div>
+                    <div class="panel-tab" data-panel="data">Data</div>
+                </div>
+
+                <!-- COMPONENTS TAB -->
+                <div id="panel-components" class="panel-content active p-5">
+                    <div class="section-title mt-2">Component Inventory</div>
+                    
+                    <div class="comp-btn" data-type="source" id="comp-source">
+                        <div class="comp-icon text-yellow-500"><i class="fa-solid fa-plug"></i></div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-bold tracking-wide text-white">DC Power Source</div>
+                            <div class="text-[10px] text-gray-500 mt-0.5 font-mono">Variable Output · 0–24V</div>
+                        </div>
+                        <span class="text-[9px] text-gray-600 font-mono">+/−</span>
+                    </div>
+                    
+                    <div class="comp-btn" data-type="resistor" id="comp-resistor">
+                        <div class="comp-icon text-red-400"><i class="fa-solid fa-wave-square"></i></div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-bold tracking-wide text-white">Ceramic Resistor</div>
+                            <div class="text-[10px] text-gray-500 mt-0.5 font-mono">Energy Dissipation (R)</div>
+                        </div>
+                        <span class="text-[9px] text-red-800 font-mono">Ω</span>
+                    </div>
+
+                    <div class="comp-btn" data-type="inductor" id="comp-inductor">
+                        <div class="comp-icon text-blue-400"><i class="fa-solid fa-magnet"></i></div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-bold tracking-wide text-white">Copper Inductor</div>
+                            <div class="text-[10px] text-gray-500 mt-0.5 font-mono">Magnetic Flux (L)</div>
+                        </div>
+                        <span class="text-[9px] text-blue-800 font-mono">mH</span>
+                    </div>
+
+                    <div class="comp-btn" data-type="capacitor" id="comp-capacitor">
+                        <div class="comp-icon text-emerald-400"><i class="fa-solid fa-grip-lines-vertical"></i></div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-bold tracking-wide text-white">Electrolytic Capacitor</div>
+                            <div class="text-[10px] text-gray-500 mt-0.5 font-mono">Electric Field (C)</div>
+                        </div>
+                        <span class="text-[9px] text-emerald-800 font-mono">µF</span>
+                    </div>
+
+                    <div class="comp-btn border border-white/5" data-type="wire" id="comp-wire">
+                        <div class="comp-icon text-gray-300"><i class="fa-solid fa-circle-nodes"></i></div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-bold tracking-wide text-white">Wiring Harness</div>
+                            <div class="text-[10px] text-gray-500 mt-0.5 font-mono">Route Connections</div>
+                        </div>
+                        <span class="kbd">W</span>
+                    </div>
+
+                    <div class="section-title mt-6">Instruments</div>
+
+                    <div class="comp-btn" data-type="ammeter" id="comp-ammeter">
+                        <div class="comp-icon text-blue-400"><i class="fa-solid fa-gauge-high"></i></div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-bold tracking-wide text-white">Ammeter (Series)</div>
+                            <div class="text-[10px] text-gray-500 mt-0.5 font-mono">Current Measurement</div>
+                        </div>
+                        <span class="text-[9px] text-blue-800 font-mono">A</span>
+                    </div>
+
+                    <div class="comp-btn" data-type="voltmeter" id="comp-voltmeter">
+                        <div class="comp-icon text-red-400"><i class="fa-solid fa-tachometer-alt"></i></div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-bold tracking-wide text-white">Voltmeter (Parallel)</div>
+                            <div class="text-[10px] text-gray-500 mt-0.5 font-mono">Voltage Measurement</div>
+                        </div>
+                        <span class="text-[9px] text-red-800 font-mono">V</span>
+                    </div>
+                </div>
+
+                <!-- PROCEDURE TAB -->
+                <div id="panel-procedure" class="panel-content p-5">
+                    <div class="section-title mt-2">Experiment Protocol</div>
+                    <div id="step-list" class="space-y-1"></div>
+                    
+                    <div class="mt-6 p-3 bg-black rounded border border-white/5">
+                        <div class="text-[9px] text-gray-500 uppercase tracking-widest mb-2 font-bold">Progress</div>
+                        <div class="w-full bg-gray-900 rounded-full h-1.5">
+                            <div id="progress-bar" class="h-1.5 rounded-full bg-gradient-to-r from-yellow-700 to-yellow-500 transition-all duration-500" style="width:0%"></div>
+                        </div>
+                        <div class="text-[10px] text-gray-500 font-mono mt-2" id="progress-text">0% Complete</div>
+                    </div>
+                </div>
+
+                <!-- THEORY TAB -->
+                <div id="panel-theory" class="panel-content p-5">
+                    <div class="section-title mt-2">Physics Theory</div>
+                    <div id="theory-content" class="text-xs text-gray-400 leading-relaxed space-y-4"></div>
+                </div>
+
+                <!-- DATA TAB -->
+                <div id="panel-data" class="panel-content p-5">
+                    <div class="section-title mt-2">Observation Table</div>
+                    <div id="data-table-wrap" class="overflow-x-auto"></div>
+                    <button id="btn-export" class="mt-4 w-full py-2 text-xs font-bold tracking-widest uppercase border border-white/10 text-gray-400 hover:text-yellow-500 hover:border-yellow-500/30 rounded transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-download"></i> Export CSV
+                    </button>
+                    <div class="section-title mt-6">Summary Statistics</div>
+                    <div id="stats-wrap" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- CENTER: 3D CANVAS -->
+            <div id="canvas-wrap">
+                <canvas id="three-canvas"></canvas>
+                
+                <!-- Wire Mode Badge -->
+                <div id="wire-mode-badge" class="flex items-center gap-3 px-5 py-2.5 rounded">
+                    <div class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
+                    <span class="text-xs font-bold tracking-widest uppercase text-yellow-500">Wiring Mode // Select Terminal 1</span>
+                </div>
+
+                <!-- AI Agent -->
+                <div id="ai-agent" class="glass p-4 rounded-xl flex gap-4 items-start shadow-2xl border border-white/10" style="animation: popIn 0.5s ease;">
+                    <div class="ai-avatar relative">
+                        <i class="fa-solid fa-microchip"></i>
+                        <div class="absolute inset-0 rounded-full border border-yellow-500/50" style="animation: pulse-ring 2.5s infinite;"></div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <div class="text-[9px] font-bold text-yellow-600 uppercase tracking-[0.2em]">System AI Architect</div>
+                            <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                        </div>
+                        <p id="ai-message" class="text-xs leading-relaxed text-gray-300 font-light">System online. Select an experiment to begin your guided lab session.</p>
+                        <div id="ai-hint-btn-wrap" class="mt-2 hidden">
+                            <button id="btn-get-hint" class="text-[10px] text-yellow-600 hover:text-yellow-400 font-bold uppercase tracking-widest transition flex items-center gap-1">
+                                <i class="fa-solid fa-lightbulb text-[8px]"></i> Get Hint
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Graph Overlay -->
+                <div id="graph-overlay" class="glass absolute bottom-24 right-24 w-72 rounded-xl p-4 hidden border border-white/10 shadow-2xl" style="z-index:50; animation: popIn 0.4s ease;">
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Live Graph — V vs I</div>
+                        <button id="btn-graph-close" class="text-gray-600 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <canvas id="graph-canvas" height="160"></canvas>
+                    <div class="mt-2 flex justify-between text-[9px] text-gray-600 font-mono">
+                        <span>Current (A) →</span>
+                        <span id="graph-slope">Slope: —</span>
+                    </div>
+                    <button id="btn-add-point" class="mt-3 w-full py-1.5 text-[10px] font-bold tracking-widest uppercase bg-yellow-600/10 text-yellow-500 border border-yellow-600/30 rounded hover:bg-yellow-600/20 transition">
+                        <i class="fa-solid fa-plus text-[9px]"></i> Record Data Point
+                    </button>
+                </div>
+
+                <!-- Oscilloscope Overlay -->
+                <div id="osc-overlay" class="glass absolute top-24 right-6 w-64 rounded-xl p-4 hidden border border-emerald-500/20 shadow-2xl" style="z-index:50;">
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="text-[9px] text-emerald-500 font-bold uppercase tracking-widest flex items-center gap-2">
+                            <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                            Oscilloscope
+                        </div>
+                        <button id="btn-osc-close" class="text-gray-600 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <canvas id="osc-canvas" height="100"></canvas>
+                    <div class="mt-2 grid grid-cols-2 gap-2 text-[9px] font-mono text-gray-600">
+                        <div>f: <span id="osc-freq" class="text-emerald-500">50 Hz</span></div>
+                        <div>φ: <span id="osc-phase" class="text-emerald-500">0°</span></div>
+                    </div>
+                </div>
+
+                <!-- Notification Area -->
+                <div id="notification"></div>
+            </div>
+
+            <!-- RIGHT PANEL -->
+            <div id="right-panel" class="side-panel glass">
+                <div class="flex border-b border-white/5 px-4 pt-4 gap-0 overflow-x-auto">
+                    <div class="panel-tab active" data-rpanel="telemetry">Meters</div>
+                    <div class="panel-tab" data-rpanel="params">Params</div>
+                    <div class="panel-tab" data-rpanel="analysis">Analysis</div>
+                    <div class="panel-tab" data-rpanel="report">Report</div>
+                </div>
+
+                <!-- TELEMETRY TAB -->
+                <div id="rpanel-telemetry" class="panel-content active p-5">
+                    <div class="section-title mt-2">Digital Telemetry</div>
+                    
+                    <div class="meter-container">
+                        <div class="meter-header">
+                            <span>VOLTMETER</span>
+                            <span id="volt-mode-label">DC</span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <div class="meter-val val-v" id="mm-v">0.00</div>
+                            <div class="meter-unit">V</div>
+                        </div>
+                        <div class="meter-bar"><div class="meter-bar-fill bg-red-400" id="bar-v" style="width:0%"></div></div>
+                    </div>
+
+                    <div class="meter-container">
+                        <div class="meter-header"><span>AMMETER</span><span>DC</span></div>
+                        <div class="flex items-baseline gap-2">
+                            <div class="meter-val val-a" id="mm-i">0.000</div>
+                            <div class="meter-unit">A</div>
+                        </div>
+                        <div class="meter-bar"><div class="meter-bar-fill bg-blue-400" id="bar-i" style="width:0%"></div></div>
+                    </div>
+
+                    <div class="meter-container mb-0">
+                        <div class="meter-header"><span>IMPEDANCE</span><span>OHM</span></div>
+                        <div class="flex items-baseline gap-2">
+                            <div class="meter-val val-o" id="mm-z">0.00</div>
+                            <div class="meter-unit">Ω</div>
+                        </div>
+                        <div class="meter-bar"><div class="meter-bar-fill bg-emerald-400" id="bar-z" style="width:0%"></div></div>
+                    </div>
+
+                    <div class="mt-4">
+                        <div class="section-title">Power Analysis</div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="bg-black p-3 rounded border border-white/5">
+                                <div class="text-[9px] text-gray-500 uppercase tracking-widest mb-1 font-bold">Power (P)</div>
+                                <div class="font-mono text-sm font-bold text-white" id="val-power">— W</div>
+                            </div>
+                            <div class="bg-black p-3 rounded border border-white/5">
+                                <div class="text-[9px] text-gray-500 uppercase tracking-widest mb-1 font-bold">Energy</div>
+                                <div class="font-mono text-sm font-bold text-white" id="val-energy">— J</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PARAMS TAB -->
+                <div id="rpanel-params" class="panel-content p-5">
+                    <div class="section-title mt-2">Circuit Parameters</div>
+                    
+                    <!-- Voltage -->
+                    <div class="mb-5">
+                        <div class="flex justify-between text-[10px] font-bold tracking-wider uppercase mb-1">
+                            <span class="text-gray-400">Source Voltage (V)</span>
+                            <span class="text-yellow-400 font-mono" id="val-v-src">12 V</span>
+                        </div>
+                        <input type="range" id="sl-v" min="1" max="24" value="12">
+                    </div>
+
+                    <div class="mb-5">
+                        <div class="flex justify-between text-[10px] font-bold tracking-wider uppercase mb-1">
+                            <span class="text-gray-400">Resistance (R)</span>
+                            <span class="text-red-400 font-mono" id="val-r">100 Ω</span>
+                        </div>
+                        <input type="range" id="sl-r" min="10" max="500" value="100">
+                    </div>
+
+                    <div id="param-lcr-group">
+                        <div class="mb-5">
+                            <div class="flex justify-between text-[10px] font-bold tracking-wider uppercase mb-1">
+                                <span class="text-gray-400">Inductance (L)</span>
+                                <span class="text-blue-400 font-mono" id="val-l">50 mH</span>
+                            </div>
+                            <input type="range" id="sl-l" min="1" max="500" value="50">
+                        </div>
+                        <div class="mb-5">
+                            <div class="flex justify-between text-[10px] font-bold tracking-wider uppercase mb-1">
+                                <span class="text-gray-400">Capacitance (C)</span>
+                                <span class="text-emerald-400 font-mono" id="val-c">100 µF</span>
+                            </div>
+                            <input type="range" id="sl-c" min="1" max="500" value="100">
+                        </div>
+                        <div class="mb-5">
+                            <div class="flex justify-between text-[10px] font-bold tracking-wider uppercase mb-1">
+                                <span class="text-gray-400">Frequency (f)</span>
+                                <span class="text-yellow-500 font-mono" id="val-f">50 Hz</span>
+                            </div>
+                            <input type="range" id="sl-f" min="1" max="1000" value="50">
+                        </div>
+                    </div>
+
+                    <div class="section-title mt-2">Temperature Effects</div>
+                    <div class="mb-5">
+                        <div class="flex justify-between text-[10px] font-bold tracking-wider uppercase mb-1">
+                            <span class="text-gray-400">Temperature (T)</span>
+                            <span class="text-orange-400 font-mono" id="val-temp">25 °C</span>
+                        </div>
+                        <input type="range" id="sl-temp" min="0" max="200" value="25">
+                        <div class="text-[9px] text-gray-600 mt-1 font-mono">R_eff = <span id="val-reff">100.00</span> Ω</div>
+                    </div>
+                </div>
+
+                <!-- ANALYSIS TAB -->
+                <div id="rpanel-analysis" class="panel-content p-5">
+                    <div class="section-title mt-2">Diagnostic Analysis</div>
+                    <div class="grid grid-cols-2 gap-2 mb-4">
+                        <div class="bg-black p-3 rounded border border-white/5">
+                            <div class="text-[9px] text-gray-500 mb-1 font-bold tracking-wider uppercase">X<sub>L</sub></div>
+                            <div class="font-mono text-sm font-bold text-white" id="rc-xl-val">—</div>
+                        </div>
+                        <div class="bg-black p-3 rounded border border-white/5">
+                            <div class="text-[9px] text-gray-500 mb-1 font-bold tracking-wider uppercase">X<sub>C</sub></div>
+                            <div class="font-mono text-sm font-bold text-white" id="rc-xc-val">—</div>
+                        </div>
+                        <div class="bg-black p-3 rounded border border-white/5">
+                            <div class="text-[9px] text-gray-500 mb-1 font-bold tracking-wider uppercase">Phase φ</div>
+                            <div class="font-mono text-sm font-bold text-white" id="rc-phi-val">—</div>
+                        </div>
+                        <div class="bg-black p-3 rounded border border-white/5">
+                            <div class="text-[9px] text-gray-500 mb-1 font-bold tracking-wider uppercase">Res. f₀</div>
+                            <div class="font-mono text-sm font-bold text-white" id="rc-f0-val">—</div>
+                        </div>
+                    </div>
+
+                    <div class="section-title">Kirchhoff Validation</div>
+                    <div id="kvl-display" class="bg-black rounded border border-white/5 p-3 font-mono text-xs text-gray-500">
+                        Initialize system to validate KVL/KCL laws.
+                    </div>
+
+                    <div class="section-title mt-4">Formula Reference</div>
+                    <div id="formula-display" class="space-y-2 text-[10px] text-gray-500 leading-relaxed"></div>
+                </div>
+
+                <!-- REPORT TAB -->
+                <div id="rpanel-report" class="panel-content p-5">
+                    <div class="section-title mt-2">Lab Report</div>
+                    
+                    <!-- Score Ring -->
+                    <div class="flex items-center gap-4 mb-4 p-3 bg-black rounded border border-white/5">
+                        <svg width="60" height="60" viewBox="0 0 60 60">
+                            <circle cx="30" cy="30" r="25" fill="none" stroke="#1a1a1a" stroke-width="4"/>
+                            <circle cx="30" cy="30" r="25" fill="none" stroke="#d4af37" stroke-width="4" stroke-linecap="round" class="score-ring" id="score-ring" transform="rotate(-90 30 30)"/>
+                            <text x="30" y="35" text-anchor="middle" fill="#d4af37" font-size="12" font-weight="bold" font-family="JetBrains Mono" id="score-ring-text">0</text>
+                        </svg>
+                        <div>
+                            <div class="text-xs font-bold text-white" id="report-grade">Grade: —</div>
+                            <div class="text-[10px] text-gray-500 mt-1">Complete experiment steps to earn points</div>
+                        </div>
+                    </div>
+
+                    <div class="section-title">Viva Questions</div>
+                    <div id="viva-list" class="space-y-3"></div>
+                    
+                    <div class="section-title mt-4">Conclusion</div>
+                    <div id="conclusion-text" class="text-xs text-gray-400 leading-relaxed bg-black p-3 rounded border border-white/5 min-h-[60px]">
+                        Run the experiment to generate your conclusion.
+                    </div>
+
+                    <button id="btn-download-report" class="mt-4 w-full py-2 text-xs font-bold tracking-widest uppercase border border-yellow-600/30 text-yellow-500 hover:bg-yellow-600/10 rounded transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-file-pdf"></i> Download Lab Report
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOTTOM STATUS BAR -->
+        <div id="bottom-bar">
+            <div class="flex items-center gap-2">
+                <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                <span class="text-[10px] text-gray-500 font-mono">SYSTEM READY</span>
+            </div>
+            <div class="w-px h-4 bg-white/10"></div>
+            <span class="text-[10px] text-gray-600 font-mono">Components: <span id="status-comps" class="text-gray-400">0</span></span>
+            <span class="text-[10px] text-gray-600 font-mono">Wires: <span id="status-wires" class="text-gray-400">0</span></span>
+            <div class="flex-1"></div>
+            <span class="text-[10px] text-gray-600 font-mono">Drag: orbit · Scroll: zoom · <span class="kbd">W</span> wire mode · <span class="kbd">R</span> reset</span>
+        </div>
+    </div>
+
+    <script>
+    // ================================================================
+    // EXPERIMENT DEFINITIONS
+    // ================================================================
+    const EXPERIMENTS = {
+        ohms: {
+            name: "Ohm's Law Verification",
+            mode: 'DC',
+            req: ['source', 'resistor'],
+            theory: `<b>Ohm's Law</b> states that the current through a conductor is directly proportional to the voltage across it, provided temperature remains constant.<br><br>
+            <b>Formula:</b> V = I × R<br><br>
+            In this experiment we verify this by varying resistance R while keeping voltage V constant, and observing that current I = V/R changes accordingly.<br><br>
+            <b>Key Principles:</b><br>
+            • Direct proportionality: I ∝ V<br>
+            • Inverse relationship: I ∝ 1/R<br>
+            • Slope of V-I graph = Resistance R`,
+            formulas: ['V = I × R', 'R = V / I', 'P = V × I = I²R'],
+            steps: [
+                "Mount the <b>DC Power Source</b> on the lab board by selecting it and clicking the board.",
+                "Mount a <b>Ceramic Resistor</b> on the board.",
+                "Select the <b>Wiring Harness</b> and connect Source (+) terminal to Resistor terminal 1.",
+                "Connect Resistor terminal 2 back to Source (−) terminal to close the loop.",
+                "Click <b>Initialize System</b> and vary R using the slider to observe the inverse relationship.",
+                "Record multiple data points using the Graph panel, then analyze the V-I plot."
+            ],
+            viva: [
+                "State Ohm's Law and identify its limitations.",
+                "What is the significance of the V-I graph slope?",
+                "How does temperature affect resistance in metals?",
+                "Differentiate between ohmic and non-ohmic conductors."
+            ],
+            conclusion: "The experiment successfully verified Ohm's Law. The V-I graph produced a straight line passing through the origin, confirming that current is directly proportional to voltage for a constant resistance. The calculated resistance from the slope matched the set resistance value within experimental tolerance."
+        },
+        lcr: {
+            name: "Series LCR Circuit",
+            mode: 'AC',
+            req: ['source', 'resistor', 'inductor', 'capacitor'],
+            theory: `A <b>Series LCR Circuit</b> combines Resistance (R), Inductance (L) and Capacitance (C) in series with an AC source.<br><br>
+            <b>Impedance:</b> Z = √(R² + (X<sub>L</sub> − X<sub>C</sub>)²)<br>
+            <b>X<sub>L</sub></b> = 2πfL &nbsp; <b>X<sub>C</sub></b> = 1/(2πfC)<br><br>
+            <b>Resonance</b> occurs when X<sub>L</sub> = X<sub>C</sub>, giving f₀ = 1/(2π√LC).<br>
+            At resonance, Z = R (minimum), and current is maximum.`,
+            formulas: ['Z = √(R² + (XL-XC)²)', 'XL = 2πfL', 'XC = 1/(2πfC)', 'f₀ = 1/(2π√LC)', 'φ = arctan((XL-XC)/R)'],
+            steps: [
+                "Mount the <b>AC Power Source</b> on the lab board.",
+                "Mount a <b>Ceramic Resistor</b> adjacent to the source.",
+                "Mount a <b>Copper Inductor</b> on the board.",
+                "Mount an <b>Electrolytic Capacitor</b> to complete the component roster.",
+                "Select the <b>Wiring Harness</b> and wire all components in a series loop.",
+                "Initialize System and tune frequency toward resonance frequency f₀ to observe peak current."
+            ],
+            viva: [
+                "Explain resonance condition in an LCR circuit.",
+                "What happens to current at resonance frequency?",
+                "Define quality factor Q of an LCR circuit.",
+                "Differentiate between inductive and capacitive reactance."
+            ],
+            conclusion: "The LCR circuit experiment demonstrated AC impedance behavior. At resonance frequency f₀, impedance was minimized to R and current peaked. Increasing f beyond f₀ made the circuit inductive (X_L > X_C), while below f₀ it became capacitive."
+        },
+        rc: {
+            name: "RC Time Constant",
+            mode: 'AC',
+            req: ['source', 'resistor', 'capacitor'],
+            theory: `An <b>RC Circuit</b> exhibits a phase difference between voltage and current due to the capacitor's reactive behavior.<br><br>
+            <b>Impedance:</b> Z = √(R² + X<sub>C</sub>²)<br>
+            <b>Phase Angle:</b> φ = −arctan(X<sub>C</sub>/R)<br><br>
+            The <b>Time Constant</b> τ = RC determines how quickly the capacitor charges/discharges. At t = τ, the capacitor reaches 63.2% of its final voltage.`,
+            formulas: ['Z = √(R² + XC²)', 'XC = 1/(2πfC)', 'τ = R × C', 'φ = -arctan(XC/R)', 'V_C(t) = V(1 - e^(-t/τ))'],
+            steps: [
+                "Mount the <b>AC Power Source</b> on the lab board.",
+                "Mount a <b>Ceramic Resistor</b> on the board.",
+                "Mount an <b>Electrolytic Capacitor</b> on the board.",
+                "Select the <b>Wiring Harness</b> and wire in a series loop.",
+                "Initialize System. Vary frequency and observe phase angle change in the oscilloscope.",
+                "Record the time constant τ = RC and verify with the displayed values."
+            ],
+            viva: [
+                "Define time constant τ for an RC circuit.",
+                "How does the capacitor behave as a filter at different frequencies?",
+                "What is the voltage across C at t = 5τ?",
+                "Explain the phase difference between V and I in an RC circuit."
+            ],
+            conclusion: "The RC circuit experiment confirmed the frequency-dependent behavior of capacitive reactance. The phase angle φ decreased with increasing frequency, and the time constant τ = RC was verified experimentally. The oscilloscope clearly showed the phase lag of current behind voltage."
+        }
+    };
+
+    // ================================================================
+    // AI MODULE
+    // ================================================================
+    const AIModule = (() => {
+        const msgEl = document.getElementById('ai-message');
+        let currentExp = 'ohms';
+        let stepIndex = 0;
+        let hintMode = false;
+
+        const hints = {
+            ohms: ["Try adjusting the Resistance slider to see current change inversely.", "Connect source (+) to resistor and back to source (−) to form a closed loop.", "V-I graph slope = R. Record 5+ data points for best-fit line."],
+            lcr: ["Tune frequency toward f₀ (shown in Analysis tab) for maximum current.", "Ensure all 4 components are wired in series — same current flows through all.", "Resonance is when XL = XC. Watch the phase angle approach 0°."],
+            rc: ["Phase angle φ becomes more negative as frequency increases.", "Try τ = RC — charge the capacitor and time it in your head!", "XC = 1/(2πfC) — increasing C reduces capacitive reactance."]
+        };
+        let hintIdx = 0;
+
+        function setExperiment(expKey) {
+            currentExp = expKey;
+            stepIndex = 0;
+            hintIdx = 0;
+            speak(EXPERIMENTS[expKey].steps[stepIndex]);
+
+            const req = EXPERIMENTS[expKey].req;
+            document.querySelectorAll('.comp-btn').forEach(btn => {
+                const type = btn.dataset.type;
+                if (!type || type === 'wire' || type === 'ammeter' || type === 'voltmeter') return;
+                if (!req.includes(type)) {
+                    btn.classList.add('dimmed');
+                } else {
+                    btn.classList.remove('dimmed');
+                }
+            });
+
+            buildStepList(expKey);
+            buildTheory(expKey);
+            buildFormulas(expKey);
+            buildViva(expKey);
+            buildDataTable(expKey);
+        }
+
+        function speak(htmlText) {
+            gsap.fromTo(msgEl, { opacity: 0, y: 4 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" });
+            msgEl.innerHTML = htmlText;
+            const avatar = document.querySelector('.ai-avatar');
+            gsap.fromTo(avatar, { scale: 0.92 }, { scale: 1, duration: 0.4, ease: "back.out(2)" });
+        }
+
+        function getHint() {
+            const h = hints[currentExp];
+            speak(`<span class="text-yellow-500">💡 Hint:</span> ${h[hintIdx % h.length]}`);
+            hintIdx++;
+        }
+
+        function evaluateState(placedTypes, wireCount, isRunning) {
+            const req = EXPERIMENTS[currentExp].req;
+            const hintBtn = document.getElementById('ai-hint-btn-wrap');
+
+            if (isRunning) {
+                speak("System active. Adjust parameters to observe dynamic responses. Use the Graph panel to record data points.");
+                hintBtn.classList.remove('hidden');
+                updateScore(30);
+                updateProgress(100);
+                generateConclusion();
+                return;
+            }
+
+            let placedValid = 0;
+            for (let type of req) { if (placedTypes.includes(type)) placedValid++; }
+
+            if (placedValid === 0) { stepIndex = 0; }
+            else if (placedValid < req.length) { stepIndex = placedValid; }
+            else if (placedValid === req.length) {
+                stepIndex = wireCount < req.length ? req.length : req.length + 1;
+            }
+
+            const progress = Math.min(100, Math.round((stepIndex / EXPERIMENTS[currentExp].steps.length) * 100));
+            updateProgress(progress);
+            updateScore(Math.floor(progress * 0.7));
+
+            if (stepIndex >= 1) hintBtn.classList.remove('hidden');
+            if (EXPERIMENTS[currentExp].steps[stepIndex]) {
+                speak(EXPERIMENTS[currentExp].steps[stepIndex]);
+            }
+            buildStepList(currentExp, stepIndex);
+        }
+
+        function buildStepList(expKey, currentStep = 0) {
+            const steps = EXPERIMENTS[expKey].steps;
+            const el = document.getElementById('step-list');
+            el.innerHTML = steps.map((s, i) => `
+                <div class="step-item ${i === currentStep ? 'current' : ''}">
+                    <div class="step-num ${i < currentStep ? 'done' : (i === currentStep ? 'current' : '')}">
+                        ${i < currentStep ? '<i class="fa-solid fa-check text-[8px]"></i>' : i + 1}
+                    </div>
+                    <div class="step-text">${s}</div>
+                </div>
+            `).join('');
+        }
+
+        function buildTheory(expKey) {
+            document.getElementById('theory-content').innerHTML = EXPERIMENTS[expKey].theory;
+        }
+
+        function buildFormulas(expKey) {
+            const fmls = EXPERIMENTS[expKey].formulas || [];
+            document.getElementById('formula-display').innerHTML = fmls.map(f =>
+                `<div class="bg-black px-3 py-2 rounded border border-white/5 font-mono text-emerald-400 text-[11px]">${f}</div>`
+            ).join('');
+        }
+
+        function buildViva(expKey) {
+            const vivaEls = EXPERIMENTS[expKey].viva || [];
+            document.getElementById('viva-list').innerHTML = vivaEls.map((q, i) =>
+                `<div class="bg-black p-3 rounded border border-white/5">
+                    <div class="text-[9px] text-yellow-600 uppercase tracking-widest font-bold mb-1">Q${i+1}</div>
+                    <div class="text-[11px] text-gray-400">${q}</div>
+                </div>`
+            ).join('');
+        }
+
+        function buildDataTable(expKey) {
+            const wrap = document.getElementById('data-table-wrap');
+            if (expKey === 'ohms') {
+                wrap.innerHTML = `<table class="data-table">
+                    <thead><tr><th>#</th><th>R (Ω)</th><th>V (V)</th><th>I (A)</th><th>V/I</th></tr></thead>
+                    <tbody id="obs-tbody"><tr><td colspan="5" class="text-center text-gray-600">No data recorded yet</td></tr></tbody>
+                </table>`;
+            } else if (expKey === 'lcr') {
+                wrap.innerHTML = `<table class="data-table">
+                    <thead><tr><th>#</th><th>f (Hz)</th><th>Z (Ω)</th><th>I (A)</th><th>φ (°)</th></tr></thead>
+                    <tbody id="obs-tbody"><tr><td colspan="5" class="text-center text-gray-600">No data recorded yet</td></tr></tbody>
+                </table>`;
+            } else {
+                wrap.innerHTML = `<table class="data-table">
+                    <thead><tr><th>#</th><th>f (Hz)</th><th>XC (Ω)</th><th>Z (Ω)</th><th>φ (°)</th></tr></thead>
+                    <tbody id="obs-tbody"><tr><td colspan="5" class="text-center text-gray-600">No data recorded yet</td></tr></tbody>
+                </table>`;
+            }
+        }
+
+        function generateConclusion() {
+            document.getElementById('conclusion-text').textContent = EXPERIMENTS[currentExp].conclusion;
+        }
+
+        function updateScore(val) {
+            const score = Math.max(0, Math.min(100, val));
+            document.getElementById('score-display').textContent = score;
+            const ring = document.getElementById('score-ring');
+            const circumference = 157;
+            ring.style.strokeDashoffset = circumference - (circumference * score / 100);
+            document.getElementById('score-ring-text').textContent = score;
+            const grades = [[90,'A+'], [80,'A'], [70,'B+'], [60,'B'], [50,'C'], [0,'D']];
+            const grade = grades.find(g => score >= g[0])?.[1] || 'D';
+            document.getElementById('report-grade').textContent = `Grade: ${grade}`;
+        }
+
+        function updateProgress(pct) {
+            document.getElementById('progress-bar').style.width = pct + '%';
+            document.getElementById('progress-text').textContent = pct + '% Complete';
+        }
+
+        return { setExperiment, evaluateState, getHint, speak, getCurrentExp: () => EXPERIMENTS[currentExp] };
+    })();
+
+    // ================================================================
+    // 3D ENGINE MODULE
+    // ================================================================
+    const SceneModule = (() => {
+        let scene, camera, renderer, raycaster, mouse;
+        let animCallbacks = [];
+
+        function init(canvas) {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050505);
+            scene.fog = new THREE.FogExp2(0x050505, 0.012);
+
+            camera = new THREE.PerspectiveCamera(35, 1, 0.1, 200);
+            camera.position.set(0, 15, 18);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance", alpha: false });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.1;
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // Lighting
+            scene.add(new THREE.AmbientLight(0x1a1a24, 0.5));
+            const spotLight = new THREE.SpotLight(0xfff5e6, 3.5);
+            spotLight.position.set(8, 20, 10);
+            spotLight.angle = Math.PI / 4;
+            spotLight.penumbra = 0.8;
+            spotLight.castShadow = true;
+            spotLight.shadow.mapSize.width = 2048;
+            spotLight.shadow.mapSize.height = 2048;
+            spotLight.shadow.bias = -0.0001;
+            scene.add(spotLight);
+            const rimLight = new THREE.SpotLight(0x4080ff, 2.0);
+            rimLight.position.set(-10, 10, -10);
+            rimLight.angle = Math.PI / 3;
+            rimLight.penumbra = 1;
+            scene.add(rimLight);
+
+            buildBoard();
+            resize();
+            window.addEventListener('resize', resize);
+            animate();
+            return { scene, camera, renderer, raycaster, mouse };
+        }
+
+        function buildBoard() {
+            const boardGeo = new THREE.BoxGeometry(18, 0.4, 10);
+            const boardMat = new THREE.MeshPhysicalMaterial({ color: 0x111111, roughness: 0.9, metalness: 0.1, clearcoat: 0.1, clearcoatRoughness: 0.8 });
+            const board = new THREE.Mesh(boardGeo, boardMat);
+            board.position.set(0, 0.2, 0); board.receiveShadow = true; board.name = 'board'; scene.add(board);
+
+            const dotGeo = new THREE.CircleGeometry(0.03, 16);
+            const dotMat = new THREE.MeshBasicMaterial({ color: 0xd4af37, transparent: true, opacity: 0.3 });
+            for (let x = -8; x <= 8; x += 1.5) {
+                for (let z = -4; z <= 4; z += 1.5) {
+                    const dot = new THREE.Mesh(dotGeo, dotMat);
+                    dot.rotation.x = -Math.PI / 2; dot.position.set(x, 0.41, z); scene.add(dot);
+                }
+            }
+
+            const floorGeo = new THREE.PlaneGeometry(100, 100);
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x020202, roughness: 0.1, metalness: 0.8 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2; floor.position.y = -2; floor.receiveShadow = true; scene.add(floor);
+        }
+
+        function resize() {
+            const wrap = document.getElementById('canvas-wrap');
+            if (!wrap) return;
+            camera.aspect = wrap.clientWidth / wrap.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+        }
+
+        function addAnimCallback(fn) { animCallbacks.push(fn); }
+        function animate() { requestAnimationFrame(animate); animCallbacks.forEach(fn => fn()); renderer.render(scene, camera); }
+
+        function getRaycaster(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            return raycaster;
+        }
+
+        return { init, addAnimCallback, getRaycaster, getScene: () => scene, getCamera: () => camera };
+    })();
+
+    // ================================================================
+    // COMPONENTS MODULE
+    // ================================================================
+    const ComponentModule = (() => {
+        const COLORS = { source: 0xd4af37, resistor: 0xcc3333, inductor: 0x3366cc, capacitor: 0x22c55e, ammeter: 0x3b82f6, voltmeter: 0xef4444 };
+        const placed = [], SNAP = [];
+        for (let x = -7; x <= 7; x += 2.5) for (let z = -2; z <= 2; z += 2.5) SNAP.push(new THREE.Vector3(x, 0.4, z));
+
+        function createComponent(type, position) {
+            const group = new THREE.Group();
+            const color = COLORS[type] || 0x888888;
+
+            if (type === 'source') {
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.2, 32), new THREE.MeshPhysicalMaterial({ color: 0x1a1a1a, metalness: 0.9, roughness: 0.2, clearcoat: 0.5 }));
+                body.castShadow = true; group.add(body);
+                const goldRing = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.2, 32), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 1, roughness: 0.1 }));
+                group.add(goldRing);
+                addTerminalPins(group, 0.7);
+            } else if (type === 'resistor') {
+                const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 0.4), new THREE.MeshPhysicalMaterial({ color: 0xdedede, roughness: 0.9 }));
+                body.castShadow = true; group.add(body);
+                [[-0.35, color], [-0.1, 0x111], [0.15, 0xd4af37], [0.35, color]].forEach(([x, c]) => {
+                    const band = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.42, 0.42), new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.4 }));
+                    band.position.x = x; group.add(band);
+                });
+                addTerminalPins(group, 0.8);
+            } else if (type === 'inductor') {
+                const core = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1.4, 32), new THREE.MeshStandardMaterial({ color: 0x111, roughness: 0.9 }));
+                core.rotation.z = Math.PI / 2; group.add(core);
+                for (let i = 0; i < 11; i++) {
+                    const coil = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.08, 16, 32), new THREE.MeshPhysicalMaterial({ color: 0xb87333, metalness: 1.0, roughness: 0.2 }));
+                    coil.rotation.y = Math.PI / 2; coil.position.x = -0.6 + i * 0.12; group.add(coil);
+                }
+                addTerminalPins(group, 0.8);
+            } else if (type === 'capacitor') {
+                [-0.15, 0.15].forEach(x => {
+                    const baseMat = new THREE.MeshPhysicalMaterial({ color, metalness: 0.4, roughness: 0.5, clearcoat: 1.0, clearcoatRoughness: 0.1 });
+                    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.9, 0.8), baseMat);
+                    plate.position.x = x; group.add(plate);
+                });
+                addTerminalPins(group, 0.6, 0.3);
+            } else if (type === 'ammeter' || type === 'voltmeter') {
+                const body = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.5, 0.7), new THREE.MeshPhysicalMaterial({ color: type === 'ammeter' ? 0x1a2a4a : 0x3a1a1a, metalness: 0.6, roughness: 0.4 }));
+                body.castShadow = true; group.add(body);
+                const screen = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.25, 0.05), new THREE.MeshBasicMaterial({ color: type === 'ammeter' ? 0x0a2060 : 0x601010 }));
+                screen.position.set(0, 0.1, 0.35); group.add(screen);
+                const label = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.02), new THREE.MeshBasicMaterial({ color: type === 'ammeter' ? 0x60a5fa : 0xf87171 }));
+                label.position.set(0, 0.1, 0.37); group.add(label);
+                addTerminalPins(group, 0.6, 0.1);
+            }
+
+            group.position.copy(position); group.position.y = 0.7;
+            const termData = getTerminals(type, group);
+
+            termData.forEach((t, i) => {
+                const visNode = new THREE.Mesh(new THREE.SphereGeometry(0.1, 32, 32), new THREE.MeshPhysicalMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 }));
+                visNode.position.copy(t.localPos); group.add(visNode); t.mesh = visNode;
+                const hitbox = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
+                hitbox.position.copy(t.localPos); hitbox.name = 'terminal';
+                hitbox.userData = { termIndex: i, compIndex: placed.length };
+                group.add(hitbox);
+            });
+
+            group.name = `comp_${type}_${placed.length}`;
+            group.userData = { type, index: placed.length };
+            SceneModule.getScene().add(group);
+            placed.push({ type, mesh: group, terminals: termData });
+
+            // Entry animation
+            group.scale.setScalar(0.01);
+            gsap.to(group.scale, { x: 1, y: 1, z: 1, duration: 0.5, ease: "back.out(2)" });
+            gsap.to(group.position, { y: 0.7, duration: 0.5, ease: "back.out(1.5)" });
+
+            return placed;
+        }
+
+        function addTerminalPins(group, extent, innerX) {
+            const pinMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1.0, roughness: 0.2 });
+            const xPos = innerX ? innerX : extent - 0.2;
+            const length = innerX ? extent - innerX : 0.4;
+            [-1, 1].forEach(sign => {
+                const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, length, 16), pinMat);
+                pin.rotation.z = Math.PI / 2; pin.position.x = sign * (xPos + length / 2); group.add(pin);
+            });
+        }
+
+        function getTerminals(type, group) {
+            const val = { source: 0.9, resistor: 1.0, inductor: 1.0, capacitor: 0.6, ammeter: 0.7, voltmeter: 0.7 }[type] || 0.8;
+            return [new THREE.Vector3(-val, 0, 0), new THREE.Vector3(val, 0, 0)].map(p => ({
+                localPos: p.clone(), mesh: null,
+                worldPos: () => { const wp = p.clone(); group.localToWorld(wp); return wp; }
+            }));
+        }
+
+        function snapToBoard(pos) {
+            let best = null, dist = Infinity;
+            SNAP.forEach(s => { const d = pos.distanceTo(s); if (d < dist) { dist = d; best = s; } });
+            return dist < 2 ? best : null;
+        }
+
+        function highlightTerminal(cIdx, tIdx, color) {
+            const c = placed[cIdx];
+            if (c && c.terminals[tIdx].mesh) {
+                c.terminals[tIdx].mesh.material.color.setHex(color);
+                c.terminals[tIdx].mesh.material.emissive.setHex(color);
+                c.terminals[tIdx].mesh.material.emissiveIntensity = (color === 0xaaaaaa) ? 0 : 0.6;
+            }
+        }
+
+        return {
+            createComponent, snapToBoard, highlightTerminal,
+            getPlaced: () => placed,
+            reset: () => { placed.forEach(c => SceneModule.getScene().remove(c.mesh)); placed.length = 0; }
+        };
+    })();
+
+    // ================================================================
+    // WIRES & PARTICLES MODULE
+    // ================================================================
+    const WireModule = (() => {
+        const wires = [], particles = [];
+        const WIRE_COLORS = ['#d4af37', '#ef4444', '#3b82f6', '#22c55e', '#f97316', '#a855f7'];
+        let wireColorIdx = 0;
+
+        function createWire(from, to) {
+            const color = parseInt(WIRE_COLORS[wireColorIdx % WIRE_COLORS.length].replace('#', ''), 16);
+            wireColorIdx++;
+
+            const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5);
+            mid.y += (from.distanceTo(to) * 0.3) + 0.3;
+
+            const curve = new THREE.QuadraticBezierCurve3(from, mid, to);
+            const geo = new THREE.TubeGeometry(curve, 32, 0.05, 16, false);
+            const mat = new THREE.MeshPhysicalMaterial({ color, roughness: 0.6, metalness: 0.1, clearcoat: 0.5 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.castShadow = true; SceneModule.getScene().add(mesh);
+
+            const count = Math.max(6, Math.floor(from.distanceTo(to) * 4));
+            const pArr = [];
+            for (let i = 0; i < count; i++) {
+                const p = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 }));
+                p.userData = { t: i / count, speed: 0.003 + Math.random() * 0.002, curve };
+                p.visible = false;
+                SceneModule.getScene().add(p); pArr.push(p); particles.push(p);
+            }
+
+            wires.push({ mesh, particles: pArr, color });
+        }
+
+        function update(active, intensity = 1.0) {
+            particles.forEach(p => {
+                p.visible = active;
+                if (!active) return;
+                p.userData.t = (p.userData.t + p.userData.speed * intensity) % 1;
+                p.position.copy(p.userData.curve.getPoint(p.userData.t));
+                p.scale.setScalar(0.4 + Math.sin(p.userData.t * Math.PI) * 0.8);
+            });
+        }
+
+        function setWireColor(colorHex, emissiveHex = 0x000000, intensity = 0) {
+            wires.forEach(w => {
+                w.mesh.material.emissive.setHex(emissiveHex);
+                w.mesh.material.emissiveIntensity = intensity;
+            });
+        }
+
+        return {
+            createWire, update, setWireColor, getWires: () => wires,
+            reset: () => {
+                wires.forEach(w => {
+                    SceneModule.getScene().remove(w.mesh);
+                    w.particles.forEach(p => SceneModule.getScene().remove(p));
+                });
+                wires.length = 0; particles.length = 0; wireColorIdx = 0;
+            }
+        };
+    })();
+
+    // ================================================================
+    // PHYSICS / CIRCUIT MODULE
+    // ================================================================
+    const CircuitModule = (() => {
+        let params = { R: 100, L: 0.05, C: 0.0001, f: 50, V: 12, T: 25 };
+        let energyAccumulator = 0;
+
+        function calculate(expType) {
+            const { R, L, C, f, V, T } = params;
+            // Temperature coefficient for copper: α = 0.00393 /°C
+            const alpha = 0.00393;
+            const R_eff = R * (1 + alpha * (T - 25));
+            const omega = 2 * Math.PI * f;
+            let XL = 0, XC = 0, Z = R_eff, I = 0, phi = 0, f0 = 0;
+
+            if (expType === 'lcr') {
+                XL = omega * L; XC = 1 / (omega * C);
+                const X = XL - XC;
+                Z = Math.sqrt(R_eff * R_eff + X * X);
+                I = V / Z;
+                phi = Math.atan2(X, R_eff) * (180 / Math.PI);
+                f0 = 1 / (2 * Math.PI * Math.sqrt(L * C));
+            } else if (expType === 'ohms') {
+                Z = R_eff; I = V / R_eff; phi = 0; XL = 0; XC = 0;
+            } else if (expType === 'rc') {
+                XC = 1 / (omega * C);
+                Z = Math.sqrt(R_eff * R_eff + XC * XC);
+                I = V / Z;
+                phi = Math.atan2(-XC, R_eff) * (180 / Math.PI);
+                XL = 0;
+            }
+
+            const P = V * I * Math.cos(phi * Math.PI / 180);
+            energyAccumulator += P * 0.016; // ~60fps, each frame ~16ms
+
+            return { XL, XC, Z, I, phi, f0, V, R: R_eff, R_nominal: R, f, P, energy: energyAccumulator };
+        }
+
+        function validate(placed, wires, reqList) {
+            const types = placed.map(c => c.type);
+            for (let req of reqList) {
+                if (!types.includes(req)) return { valid: false, reason: \`Missing: [\${req.toUpperCase()}] component required.\` };
+            }
+            if (wires.length < reqList.length) return { valid: false, reason: "Incomplete wiring — form a closed circuit loop." };
+            return { valid: true };
+        }
+
+        return { setParam: (k, v) => { params[k] = v; if (k === 'R' || k === 'T') energyAccumulator = 0; }, calculate, validate, resetEnergy: () => energyAccumulator = 0 };
+    })();
+
+    // ================================================================
+    // GRAPH MODULE
+    // ================================================================
+    const GraphModule = (() => {
+        const dataPoints = []; // {x, y}
+        let canvas, ctx;
+
+        function init() {
+            canvas = document.getElementById('graph-canvas');
+            ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+            canvas.height = 160 * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            draw();
+        }
+
+        function addPoint(I, V) {
+            dataPoints.push({ x: parseFloat(I.toFixed(4)), y: parseFloat(V.toFixed(3)) });
+            draw();
+            updateStats();
+            showNotification(\`Data point recorded: V=\${V.toFixed(2)}V, I=\${I.toFixed(4)}A\`, 'success');
+        }
+
+        function draw() {
+            if (!ctx) return;
+            const w = canvas.offsetWidth, h = 160;
+            ctx.clearRect(0, 0, w, h);
+
+            // Background
+            ctx.fillStyle = '#050a05'; ctx.fillRect(0, 0, w, h);
+
+            // Grid
+            ctx.strokeStyle = '#0a1a0a'; ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                ctx.beginPath(); ctx.moveTo(0, i * h / 5); ctx.lineTo(w, i * h / 5); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(i * w / 5, 0); ctx.lineTo(i * w / 5, h); ctx.stroke();
+            }
+
+            // Axes
+            ctx.strokeStyle = '#2d5a2d'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(30, 0); ctx.lineTo(30, h - 20); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(30, h - 20); ctx.lineTo(w, h - 20); ctx.stroke();
+
+            if (dataPoints.length < 2) {
+                // Placeholder message
+                ctx.fillStyle = '#2d4a2d'; ctx.font = '11px JetBrains Mono';
+                ctx.textAlign = 'center'; ctx.fillText('Record data points to plot', w / 2, h / 2);
+                return;
+            }
+
+            const maxX = Math.max(...dataPoints.map(p => p.x)) * 1.1 || 1;
+            const maxY = Math.max(...dataPoints.map(p => p.y)) * 1.1 || 1;
+            const plotW = w - 40, plotH = h - 30;
+
+            const toCanvas = (x, y) => ({
+                px: 30 + (x / maxX) * plotW,
+                py: h - 20 - (y / maxY) * plotH
+            });
+
+            // Best fit line
+            if (dataPoints.length >= 2) {
+                const n = dataPoints.length;
+                const sumX = dataPoints.reduce((s, p) => s + p.x, 0);
+                const sumY = dataPoints.reduce((s, p) => s + p.y, 0);
+                const sumXY = dataPoints.reduce((s, p) => s + p.x * p.y, 0);
+                const sumX2 = dataPoints.reduce((s, p) => s + p.x * p.x, 0);
+                const m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+                const b = (sumY - m * sumX) / n;
+
+                document.getElementById('graph-slope').textContent = \`Slope (R): \${m.toFixed(1)} Ω\`;
+
+                ctx.strokeStyle = 'rgba(212,175,55,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                const p1 = toCanvas(0, b), p2 = toCanvas(maxX, m * maxX + b);
+                ctx.moveTo(p1.px, p1.py); ctx.lineTo(p2.px, p2.py); ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Data points
+            dataPoints.forEach(p => {
+                const { px, py } = toCanvas(p.x, p.y);
+                ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#d4af37'; ctx.fill();
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+            });
+
+            // Connect with line
+            ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            dataPoints.forEach((p, i) => {
+                const { px, py } = toCanvas(p.x, p.y);
+                i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+            });
+            ctx.stroke();
+        }
+
+        function updateStats() {
+            if (dataPoints.length < 2) return;
+            const Is = dataPoints.map(p => p.x), Vs = dataPoints.map(p => p.y);
+            const avgI = Is.reduce((s, v) => s + v) / Is.length;
+            const avgV = Vs.reduce((s, v) => s + v) / Vs.length;
+            document.getElementById('stats-wrap').innerHTML = \`
+                <div class="bg-black p-2 rounded border border-white/5 text-[10px] font-mono"><span class="text-gray-500">Points:</span> <span class="text-white">\${dataPoints.length}</span></div>
+                <div class="bg-black p-2 rounded border border-white/5 text-[10px] font-mono"><span class="text-gray-500">Avg V:</span> <span class="text-red-400">\${avgV.toFixed(3)} V</span></div>
+                <div class="bg-black p-2 rounded border border-white/5 text-[10px] font-mono"><span class="text-gray-500">Avg I:</span> <span class="text-blue-400">\${avgI.toFixed(4)} A</span></div>
+                <div class="bg-black p-2 rounded border border-white/5 text-[10px] font-mono"><span class="text-gray-500">Calc R:</span> <span class="text-emerald-400">\${(avgV/avgI).toFixed(1)} Ω</span></div>
+            \`;
+        }
+
+        function addObsRow(vals, expType) {
+            const tbody = document.getElementById('obs-tbody');
+            if (!tbody) return;
+            const rowNum = tbody.querySelectorAll('tr:not(.empty-row)').length + 1;
+            if (tbody.querySelector('.empty-row')) tbody.innerHTML = '';
+            const row = document.createElement('tr');
+            if (expType === 'ohms') {
+                row.innerHTML = \`<td>\${rowNum}</td><td>\${vals.R_nominal?.toFixed(0)}</td><td>\${vals.V.toFixed(2)}</td><td>\${vals.I.toFixed(4)}</td><td>\${(vals.V/vals.I).toFixed(1)}</td>\`;
+            } else if (expType === 'lcr') {
+                row.innerHTML = \`<td>\${rowNum}</td><td>\${vals.f.toFixed(0)}</td><td>\${vals.Z.toFixed(2)}</td><td>\${vals.I.toFixed(4)}</td><td>\${vals.phi.toFixed(1)}°</td>\`;
+            } else {
+                row.innerHTML = \`<td>\${rowNum}</td><td>\${vals.f.toFixed(0)}</td><td>\${vals.XC.toFixed(2)}</td><td>\${vals.Z.toFixed(2)}</td><td>\${vals.phi.toFixed(1)}°</td>\`;
+            }
+            tbody.appendChild(row);
+        }
+
+        function exportCSV(expType) {
+            const rows = [['Experiment: ' + EXPERIMENTS[expType].name]];
+            const header = expType === 'ohms' ? ['#','R(Ω)','V(V)','I(A)','V/I'] : expType === 'lcr' ? ['#','f(Hz)','Z(Ω)','I(A)','φ(°)'] : ['#','f(Hz)','XC(Ω)','Z(Ω)','φ(°)'];
+            rows.push(header);
+            document.querySelectorAll('#obs-tbody tr').forEach((tr, i) => {
+                rows.push(Array.from(tr.querySelectorAll('td')).map(td => td.textContent));
+            });
+            const csv = rows.map(r => r.join(',')).join('\\n');
+            const a = document.createElement('a');
+            a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+            a.download = 'labpro_data.csv'; a.click();
+        }
+
+        function reset() { dataPoints.length = 0; draw(); }
+
+        return { init, addPoint, addObsRow, exportCSV, reset, getCurrentVals: () => null };
+    })();
+
+    // ================================================================
+    // OSCILLOSCOPE MODULE
+    // ================================================================
+    const OscModule = (() => {
+        let canvas, ctx, t = 0;
+
+        function init() {
+            canvas = document.getElementById('osc-canvas');
+            ctx = canvas.getContext('2d');
+            canvas.width = 256;
+            canvas.height = 100;
+        }
+
+        function draw(f, phi_deg, active) {
+            if (!ctx) return;
+            const w = 256, h = 100;
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = '#000c00'; ctx.fillRect(0, 0, w, h);
+
+            // Grid
+            ctx.strokeStyle = '#001500'; ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                ctx.beginPath(); ctx.moveTo(0, i * h / 4); ctx.lineTo(w, i * h / 4); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(i * w / 4, 0); ctx.lineTo(i * w / 4, h); ctx.stroke();
+            }
+
+            const phi = phi_deg * Math.PI / 180;
+            t += 0.06;
+
+            if (active) {
+                // Voltage waveform (yellow)
+                ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                for (let x = 0; x < w; x++) {
+                    const angle = (x / w) * Math.PI * 4 + t;
+                    const y = h / 2 - Math.sin(angle) * (h * 0.35);
+                    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+
+                // Current waveform (blue, phase shifted)
+                ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                for (let x = 0; x < w; x++) {
+                    const angle = (x / w) * Math.PI * 4 + t - phi;
+                    const y = h / 2 - Math.sin(angle) * (h * 0.28);
+                    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            } else {
+                ctx.strokeStyle = '#001800'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+            }
+
+            // Scanline effect
+            ctx.fillStyle = 'rgba(0,255,0,0.015)';
+            const scan = (t * 30) % h;
+            ctx.fillRect(0, scan, w, 3);
+        }
+
+        return { init, draw };
+    })();
+
+    // ================================================================
+    // UI MODULE
+    // ================================================================
+    const UIModule = (() => {
+        let active = false;
+        const fmt = (v, d = 2) => Number.isFinite(v) ? v.toFixed(d) : '0.00';
+
+        function updateVals(vals, expType) {
+            if (!active) return;
+            document.getElementById('mm-v').textContent = fmt(vals.V);
+            document.getElementById('mm-i').textContent = fmt(vals.I, 4);
+            document.getElementById('mm-z').textContent = fmt(vals.Z);
+
+            // Meter bars
+            document.getElementById('bar-v').style.width = Math.min(100, (vals.V / 24) * 100) + '%';
+            document.getElementById('bar-i').style.width = Math.min(100, (vals.I / 2) * 100) + '%';
+            document.getElementById('bar-z').style.width = Math.min(100, (vals.Z / 500) * 100) + '%';
+
+            // Power
+            document.getElementById('val-power').textContent = fmt(vals.P) + ' W';
+            document.getElementById('val-energy').textContent = fmt(vals.energy) + ' J';
+
+            // Analysis
+            document.getElementById('rc-xl-val').textContent = (expType === 'lcr') ? fmt(vals.XL) + ' Ω' : 'N/A';
+            document.getElementById('rc-xc-val').textContent = (expType === 'lcr' || expType === 'rc') ? fmt(vals.XC) + ' Ω' : 'N/A';
+            document.getElementById('rc-phi-val').textContent = fmt(vals.phi) + '°';
+            document.getElementById('rc-f0-val').textContent = (expType === 'lcr') ? fmt(vals.f0) + ' Hz' : 'N/A';
+
+            // KVL validation
+            const vr = vals.I * vals.R;
+            const diff = Math.abs(vals.V - vr);
+            document.getElementById('kvl-display').innerHTML = expType === 'ohms'
+                ? \`<span class="text-gray-400">KVL: </span><span class="text-yellow-500">\${fmt(vals.V)}V</span><span class="text-gray-500"> = I×R = </span><span class="text-emerald-400">\${fmt(vr)}V</span><br><span class="text-gray-500">Error: \${fmt(diff * 100 / vals.V, 3)}% </span><span class="\${diff < 0.01 ? 'text-emerald-400' : 'text-red-400'}">[\${diff < 0.01 ? 'VALID' : 'CHECK'}]</span>\`
+                : \`<span class="text-gray-400">Z = √(R²+(XL-XC)²) = </span><span class="text-emerald-400">\${fmt(vals.Z)} Ω</span>\`;
+
+            // Status bar
+            document.getElementById('status-comps').textContent = ComponentModule.getPlaced().length;
+            document.getElementById('status-wires').textContent = WireModule.getWires().length;
+
+            // Reff display
+            document.getElementById('val-reff').textContent = fmt(vals.R, 2);
+        }
+
+        function resetUI() {
+            active = false;
+            ['mm-v', 'mm-z'].forEach(id => document.getElementById(id).textContent = '0.00');
+            document.getElementById('mm-i').textContent = '0.0000';
+            ['rc-xl-val', 'rc-xc-val', 'rc-phi-val', 'rc-f0-val'].forEach(id => {
+                const el = document.getElementById(id); if (el) el.textContent = '—';
+            });
+            ['bar-v', 'bar-i', 'bar-z'].forEach(id => document.getElementById(id).style.width = '0%');
+            document.getElementById('val-power').textContent = '— W';
+            document.getElementById('val-energy').textContent = '— J';
+            document.getElementById('status-comps').textContent = '0';
+            document.getElementById('status-wires').textContent = '0';
+        }
+
+        return {
+            setActive: (v) => { active = v; },
+            isActive: () => active,
+            updateVals, resetUI
+        };
+    })();
+
+    // ================================================================
+    // NOTIFICATION SYSTEM
+    // ================================================================
+    function showNotification(msg, type = 'info') {
+        const wrap = document.getElementById('notification');
+        const div = document.createElement('div');
+        div.className = \`notif \${type}\`;
+        const icons = { success: 'fa-check-circle', error: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+        div.innerHTML = \`<i class="fa-solid \${icons[type]} text-xs"></i> \${msg}\`;
+        wrap.appendChild(div);
+        requestAnimationFrame(() => div.classList.add('show'));
+        setTimeout(() => { div.classList.remove('show'); setTimeout(() => div.remove(), 500); }, 3000);
+    }
+
+    // ================================================================
+    // PANEL TAB SYSTEM
+    // ================================================================
+    function initTabs() {
+        document.querySelectorAll('[data-panel]').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('[data-panel]').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.panel-content').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                const panelId = 'panel-' + tab.dataset.panel;
+                const el = document.getElementById(panelId);
+                if (el) el.classList.add('active');
+            });
+        });
+
+        document.querySelectorAll('[data-rpanel]').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('[data-rpanel]').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('[id^="rpanel-"]').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                const panelId = 'rpanel-' + tab.dataset.rpanel;
+                const el = document.getElementById(panelId);
+                if (el) el.classList.add('active');
+            });
+        });
+    }
+
+    // ================================================================
+    // MAIN APP
+    // ================================================================
+    const App = (() => {
+        let selected = null, wireMode = false, pWire = null;
+        let orbit = { theta: 0.5, phi: 1.0, radius: 18, target: new THREE.Vector3(0, 0, 0) };
+        let currentVals = null;
+
+        function init() {
+            SceneModule.init(document.getElementById('three-canvas'));
+            OscModule.init();
+            GraphModule.init();
+            initTabs();
+
+            AIModule.setExperiment('ohms');
+
+            // Experiment selector
+            document.getElementById('exp-selector').addEventListener('change', (e) => {
+                handleReset();
+                const expType = e.target.value;
+                AIModule.setExperiment(expType);
+
+                // Show/hide L,C,f params based on experiment
+                const lcrGroup = document.getElementById('param-lcr-group');
+                lcrGroup.style.display = expType === 'ohms' ? 'none' : 'block';
+
+                const voltLabel = document.getElementById('volt-mode-label');
+                voltLabel.textContent = EXPERIMENTS[expType].mode;
+            });
+
+            // Hide L/C for ohms by default
+            document.getElementById('param-lcr-group').style.display = 'none';
+
+            // Component buttons
+            document.querySelectorAll('.comp-btn').forEach(el => {
+                el.addEventListener('click', () => {
+                    const req = AIModule.getCurrentExp().req;
+                    const type = el.dataset.type;
+                    if (type !== 'wire' && type !== 'ammeter' && type !== 'voltmeter' && !req.includes(type)) return;
+                    setMode(type);
+                });
+            });
+
+            // Reset
+            document.getElementById('btn-reset').addEventListener('click', handleReset);
+
+            // Run
+            document.getElementById('btn-run').addEventListener('click', () => {
+                if (UIModule.isActive()) {
+                    UIModule.setActive(false);
+                    const btn = document.getElementById('btn-run');
+                    btn.innerHTML = '<i class="fa-solid fa-power-off"></i> Initialize';
+                    btn.className = btn.className.replace('bg-red-600 hover:bg-red-500', 'bg-yellow-600 hover:bg-yellow-500');
+                    WireModule.setWireColor(0x555555, 0x000000, 0);
+                    AIModule.evaluateState(ComponentModule.getPlaced().map(c => c.type), WireModule.getWires().length, false);
+                    CircuitModule.resetEnergy();
+                    return;
+                }
+
+                const expType = document.getElementById('exp-selector').value;
+                const req = AIModule.getCurrentExp().req;
+                const res = CircuitModule.validate(ComponentModule.getPlaced(), WireModule.getWires(), req);
+                if (res.valid) {
+                    UIModule.setActive(true);
+                    const btn = document.getElementById('btn-run');
+                    btn.innerHTML = '<i class="fa-solid fa-stop"></i> Terminate';
+                    btn.className = btn.className.replace('bg-yellow-600 hover:bg-yellow-500', 'bg-red-600 hover:bg-red-500');
+                    WireModule.setWireColor(0x1a1a1a, 0xd4af37, 1.5);
+                    AIModule.evaluateState([], 0, true);
+                    showNotification('System initialized! Adjust parameters.', 'success');
+                } else {
+                    AIModule.speak(\`<span class="text-red-400">⚠ \${res.reason}</span>\`);
+                    showNotification(res.reason, 'error');
+                }
+            });
+
+            // Sliders
+            [
+                { id: 'sl-v', valId: 'val-v-src', key: 'V', unit: ' V', mult: 1 },
+                { id: 'sl-r', valId: 'val-r', key: 'R', unit: ' Ω', mult: 1 },
+                { id: 'sl-l', valId: 'val-l', key: 'L', unit: ' mH', mult: 0.001 },
+                { id: 'sl-c', valId: 'val-c', key: 'C', unit: ' µF', mult: 0.000001 },
+                { id: 'sl-f', valId: 'val-f', key: 'f', unit: ' Hz', mult: 1 },
+                { id: 'sl-temp', valId: 'val-temp', key: 'T', unit: ' °C', mult: 1 }
+            ].forEach(b => {
+                const el = document.getElementById(b.id);
+                if (!el) return;
+                el.addEventListener('input', () => {
+                    document.getElementById(b.valId).textContent = el.value + b.unit;
+                    CircuitModule.setParam(b.key, parseFloat(el.value) * b.mult);
+                });
+            });
+
+            // Graph toggle
+            document.getElementById('btn-graph-toggle').addEventListener('click', () => {
+                const overlay = document.getElementById('graph-overlay');
+                overlay.classList.toggle('hidden');
+                if (!overlay.classList.contains('hidden')) {
+                    setTimeout(() => GraphModule.init(), 100);
+                }
+            });
+            document.getElementById('btn-graph-close').addEventListener('click', () => {
+                document.getElementById('graph-overlay').classList.add('hidden');
+            });
+
+            // Record data point
+            document.getElementById('btn-add-point').addEventListener('click', () => {
+                if (!UIModule.isActive() || !currentVals) {
+                    showNotification('Initialize system first!', 'error'); return;
+                }
+                const expType = document.getElementById('exp-selector').value;
+                GraphModule.addPoint(currentVals.I, currentVals.V);
+                GraphModule.addObsRow(currentVals, expType);
+
+                // Switch to data tab
+                document.querySelectorAll('[data-panel]').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.panel-content').forEach(p => p.classList.remove('active'));
+                document.querySelector('[data-panel="data"]').classList.add('active');
+                document.getElementById('panel-data').classList.add('active');
+            });
+
+            // Osc close
+            document.getElementById('btn-osc-close').addEventListener('click', () => {
+                document.getElementById('osc-overlay').classList.add('hidden');
+            });
+
+            // AI hint
+            document.getElementById('btn-get-hint').addEventListener('click', () => {
+                AIModule.getHint();
+            });
+
+            // AI toggle
+            document.getElementById('btn-ai-toggle').addEventListener('click', () => {
+                const agent = document.getElementById('ai-agent');
+                agent.style.display = agent.style.display === 'none' ? 'flex' : 'none';
+            });
+
+            // Export CSV
+            document.getElementById('btn-export').addEventListener('click', () => {
+                const expType = document.getElementById('exp-selector').value;
+                GraphModule.exportCSV(expType);
+            });
+
+            // Download report (simple text)
+            document.getElementById('btn-download-report').addEventListener('click', () => {
+                const expType = document.getElementById('exp-selector').value;
+                const exp = EXPERIMENTS[expType];
+                const content = \`LABPRO VIRTUAL PHYSICS LABORATORY\\nLab Report\\n\${'='.repeat(50)}\\n\\nExperiment: \${exp.name}\\nDate: \${new Date().toLocaleDateString()}\\n\\nTHEORY:\\n\${exp.theory.replace(/<[^>]+>/g,'')}\\n\\nCONCLUSION:\\n\${exp.conclusion}\\n\\nVIVA QUESTIONS:\\n\${exp.viva.map((q,i) => \`Q\${i+1}: \${q}\`).join('\\n')}\\n\\nGenerated by LabPro AI Virtual Lab\`;
+                const a = document.createElement('a');
+                a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
+                a.download = 'labpro_report.txt'; a.click();
+                showNotification('Lab report downloaded!', 'success');
+            });
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', e => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+                if (e.key === 'w' || e.key === 'W') setMode('wire');
+                if (e.key === 'r' || e.key === 'R') handleReset();
+                if (e.key === 'Escape') { setMode(null); }
+            });
+
+            setupInteraction();
+            SceneModule.addAnimCallback(tick);
+        }
+
+        function handleReset() {
+            ComponentModule.reset(); WireModule.reset(); UIModule.resetUI();
+            const btn = document.getElementById('btn-run');
+            btn.innerHTML = '<i class="fa-solid fa-power-off"></i> Initialize';
+            btn.className = btn.className.replace('bg-red-600 hover:bg-red-500', 'bg-yellow-600 hover:bg-yellow-500');
+            setMode(null);
+            AIModule.evaluateState([], 0, false);
+            GraphModule.reset();
+            CircuitModule.resetEnergy();
+            currentVals = null;
+            showNotification('Board cleared.', 'info');
+        }
+
+        function setMode(type) {
+            selected = type; wireMode = (type === 'wire'); pWire = null;
+            document.querySelectorAll('.comp-btn').forEach(el => el.classList.remove('selected'));
+            if (type) {
+                const el = document.getElementById(\`comp-\${type}\`);
+                if (el) el.classList.add('selected');
+            }
+
+            const badge = document.getElementById('wire-mode-badge');
+            if (wireMode) {
+                badge.style.display = 'flex';
+                badge.innerHTML = '<div class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div><span class="text-xs font-bold tracking-widest uppercase text-yellow-500">Wiring Mode // Select Terminal 1</span>';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        function setupInteraction() {
+            const cvs = document.getElementById('three-canvas');
+            let md = false, lp = { x: 0, y: 0 };
+
+            cvs.addEventListener('pointerdown', e => { md = true; lp = { x: e.clientX, y: e.clientY }; });
+            cvs.addEventListener('pointermove', e => {
+                if (!md || wireMode || selected) return;
+                orbit.theta -= (e.clientX - lp.x) * 0.007;
+                orbit.phi = Math.max(0.15, Math.min(1.4, orbit.phi - (e.clientY - lp.y) * 0.007));
+                lp = { x: e.clientX, y: e.clientY }; updateCam();
+            });
+            cvs.addEventListener('pointerup', e => {
+                md = false;
+                if (Math.abs(e.clientX - lp.x) > 4 || Math.abs(e.clientY - lp.y) > 4) return;
+
+                const rc = SceneModule.getRaycaster(e);
+
+                if (wireMode) {
+                    const hits = rc.intersectObjects(SceneModule.getScene().children, true).filter(h => h.object.name === 'terminal');
+                    if (hits.length) handleWireHit(hits[0].object);
+                } else if (selected) {
+                    const hits = rc.intersectObjects(SceneModule.getScene().children.filter(c => c.name === 'board'), true);
+                    if (hits.length) {
+                        let p = hits[0].point.clone();
+                        const snap = ComponentModule.snapToBoard(p);
+                        if (snap) p = snap; p.y = 0.4;
+                        ComponentModule.createComponent(selected, p);
+                        setMode(null);
+                        AIModule.evaluateState(ComponentModule.getPlaced().map(c => c.type), WireModule.getWires().length, false);
+                        document.getElementById('status-comps').textContent = ComponentModule.getPlaced().length;
+                        showNotification(\`\${selected.charAt(0).toUpperCase() + selected.slice(1)} placed on board.\`, 'info');
+                    }
+                }
+            });
+            cvs.addEventListener('dblclick', e => {
+                // Focus on clicked component
+                const rc = SceneModule.getRaycaster(e);
+                const hits = rc.intersectObjects(SceneModule.getScene().children, true).filter(h => h.object.parent && h.object.parent.userData.type);
+                if (hits.length) {
+                    const pos = hits[0].object.parent.position;
+                    orbit.target.set(pos.x, 0, pos.z);
+                    orbit.radius = 10;
+                    updateCam();
+                }
+            });
+            cvs.addEventListener('wheel', e => { orbit.radius = Math.max(8, Math.min(30, orbit.radius + e.deltaY * 0.015)); updateCam(); }, { passive: true });
+        }
+
+        function handleWireHit(mesh) {
+            const cIdx = mesh.userData.compIndex, tIdx = mesh.userData.termIndex;
+            if (!pWire) {
+                pWire = { cIdx, tIdx };
+                ComponentModule.highlightTerminal(cIdx, tIdx, 0xd4af37);
+                document.getElementById('wire-mode-badge').innerHTML = '<div class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div><span class="text-xs font-bold tracking-widest uppercase text-blue-400">Wiring Mode // Select Terminal 2</span>';
+            } else {
+                if (pWire.cIdx !== cIdx) {
+                    const p1 = ComponentModule.getPlaced()[pWire.cIdx].terminals[pWire.tIdx].worldPos();
+                    const p2 = ComponentModule.getPlaced()[cIdx].terminals[tIdx].worldPos();
+                    WireModule.createWire(p1, p2);
+                    ComponentModule.highlightTerminal(pWire.cIdx, pWire.tIdx, 0x44ff88);
+                    ComponentModule.highlightTerminal(cIdx, tIdx, 0x44ff88);
+                    AIModule.evaluateState(ComponentModule.getPlaced().map(c => c.type), WireModule.getWires().length, false);
+                    document.getElementById('status-wires').textContent = WireModule.getWires().length;
+                    showNotification('Wire connected!', 'success');
+                } else {
+                    ComponentModule.highlightTerminal(pWire.cIdx, pWire.tIdx, 0xaaaaaa);
+                }
+                pWire = null;
+                document.getElementById('wire-mode-badge').innerHTML = '<div class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div><span class="text-xs font-bold tracking-widest uppercase text-yellow-500">Wiring Mode // Select Terminal 1</span>';
+            }
+        }
+
+        function updateCam() {
+            const c = SceneModule.getCamera();
+            gsap.to(c.position, {
+                x: orbit.target.x + orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta),
+                y: orbit.target.y + orbit.radius * Math.cos(orbit.phi),
+                z: orbit.target.z + orbit.radius * Math.sin(orbit.phi) * Math.cos(orbit.theta),
+                duration: 0.4, ease: 'power2.out',
+                onUpdate: () => c.lookAt(orbit.target)
+            });
+        }
+
+        function tick() {
+            const expType = document.getElementById('exp-selector').value;
+            const vals = CircuitModule.calculate(expType);
+            currentVals = vals;
+            const active = UIModule.isActive();
+            WireModule.update(active, Math.min(3.0, vals.I * 10));
+            if (active) {
+                UIModule.updateVals(vals, expType);
+                OscModule.draw(vals.f, vals.phi, true);
+            } else {
+                OscModule.draw(vals.f || 50, 0, false);
+            }
+        }
+
+        return { init };
+    })();
+
+    // ================================================================
+    // LAUNCH / CLOSE
+    // ================================================================
+    let appInitialized = false;
+
+    // Remove landing page and auto launch on load
+    document.addEventListener('DOMContentLoaded', () => {
+        const landingView = document.getElementById('landing-view');
+        if (landingView) landingView.style.display = 'none';
+        
+        const appView = document.getElementById('app-view');
+        appView.style.display = 'flex';
+        App.init();
+        appInitialized = true;
+        setTimeout(() => {
+            document.getElementById('overlay-loader').classList.add('hidden');
+            window.dispatchEvent(new Event('resize'));
+            document.getElementById('osc-overlay').classList.remove('hidden');
+        }, 1500);
+    });
+
+    function closeLab() {
+        window.parent.postMessage('close-lab', '*');
+    }
+    </script>
+</body>
+</html>
