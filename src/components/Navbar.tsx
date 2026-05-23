@@ -13,7 +13,8 @@ export default function Navbar() {
       <motion.nav 
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className="fixed top-0 left-0 right-0 z-50 h-20 px-4 md:px-6 flex items-center justify-between pointer-events-none"
+        className="fixed top-0 left-0 right-0 z-[100] h-20 px-4 md:px-6 flex items-center justify-between pointer-events-none"
+        style={{ transform: "translateZ(9999px)", transformStyle: "preserve-3d", isolation: "isolate" }}
       >
         <div className="flex items-center gap-2 pointer-events-auto cursor-pointer" onClick={() => { setLabOpen(false); setMobileMenuOpen(false); }}>
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-neon to-blue-electric flex items-center justify-center shadow-lg shadow-indigo-neon/20">
