@@ -5,6 +5,7 @@ import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useAppStore } from '../store/useAppStore';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -41,10 +42,14 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
   const meshRef = useRef<THREE.Group>(null);
   const materialRef1 = useRef<THREE.MeshStandardMaterial>(null);
   const materialRef2 = useRef<THREE.MeshStandardMaterial>(null);
+  const haloRef = useRef<THREE.MeshBasicMaterial>(null);
+  const bounceRef = useRef<THREE.MeshBasicMaterial>(null);
+
+  const highFidelityMode = useAppStore((state) => state.highFidelityMode);
   
-  const ledColor = "#4ade80";
-  const ledEmissive = "#22c55e";
-  const emissiveFactor = isLogo ? 6 : 2;
+  const ledColor = "#F3FF65"; // bright core yellow-green
+  const ledEmissive = "#C7FF00"; // outer soft emission
+  const emissiveFactor = isLogo ? 3.0 : 1.5;
 
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
@@ -54,35 +59,45 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
     if (materialRef1.current && materialRef2.current) {
         if (type === 'led') {
             const timeOffset = index * 0.5;
-            let currentEmissiveIntensity = THREE.MathUtils.lerp(0.1, emissiveFactor, Math.pow(progress, 4));
+            const osc = Math.sin(t * 2.5 + timeOffset) * 0.35 + 0.65; // smooth osc 0.3 to 1.0
+            const maxIntensity = isLogo ? 3.0 : 1.5;
+            let currentEmissiveIntensity = THREE.MathUtils.lerp(0.12, maxIntensity * osc, Math.pow(progress, 3));
+
+            // Realistic electric current high-frequency flicker randomness
+            const flicker = 0.94 + 0.06 * Math.sin(t * 43.0 + index * 29.0) * Math.cos(t * 17.0 + index * 11.0);
+            currentEmissiveIntensity *= flicker;
 
             // Morph color beautifully when fully formed
             if (progress > 0.9) {
-                // Randomly blink off briefly to look like computation
-                const blinkSpeed = isLogo ? 6 : 4;
-                const blinkPhase = Math.sin(t * blinkSpeed + timeOffset);
-                const isBlinking = blinkPhase > 0.85;
-                if (isBlinking) currentEmissiveIntensity = 0;
-
                 const targetColor = new THREE.Color(ledEmissive);
                 materialRef1.current.emissive.copy(targetColor);
                 materialRef2.current.emissive.copy(targetColor);
-                if (!isBlinking) {
-                    currentEmissiveIntensity *= (1 + Math.sin(t * 4 + index) * 0.3); // pulse smoothly
-                }
             } else {
                  materialRef1.current.emissive.set(ledEmissive);
                  materialRef2.current.emissive.set(ledEmissive);
             }
 
             materialRef1.current.emissiveIntensity = currentEmissiveIntensity;
-            materialRef2.current.emissiveIntensity = currentEmissiveIntensity * 0.8;
+            materialRef2.current.emissiveIntensity = currentEmissiveIntensity * 0.75;
+
+            // Sync procedural halos and ground bounce lights
+            if (highFidelityMode) {
+                const amp = currentEmissiveIntensity / 3.0;
+                if (haloRef.current) {
+                    haloRef.current.opacity = (0.02 + 0.08 * amp) * progress;
+                }
+                if (bounceRef.current) {
+                    bounceRef.current.opacity = (0.02 + 0.06 * amp) * progress;
+                }
+            }
         } else {
-            materialRef1.current.emissiveIntensity = THREE.MathUtils.lerp(0.1, emissiveFactor, Math.pow(progress, 4));
-            materialRef2.current.emissiveIntensity = THREE.MathUtils.lerp(0.05, emissiveFactor * 0.8, Math.pow(progress, 4));
+            materialRef1.current.emissiveIntensity = THREE.MathUtils.lerp(0.05, emissiveFactor, Math.pow(progress, 4));
+            materialRef2.current.emissiveIntensity = THREE.MathUtils.lerp(0.02, emissiveFactor * 0.8, Math.pow(progress, 4));
         }
     }
   });
+
+  const subdivisions = highFidelityMode ? 16 : 8;
 
   return (
     <group ref={meshRef} position={position} scale={0.8}>
@@ -90,35 +105,35 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
         <group>
           {/* Main body: using a capsule for smooth ends */}
           <mesh rotation={[0, 0, Math.PI / 2]}>
-            <capsuleGeometry args={[0.13, 0.6, 16, 16]} />
+            <capsuleGeometry args={[0.13, 0.6, subdivisions, subdivisions]} />
             <meshStandardMaterial color="#eacba0" roughness={0.9} />
           </mesh>
           {/* Realistic wider end caps */}
           <mesh position={[-0.35, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-             <cylinderGeometry args={[0.16, 0.16, 0.15, 16]} />
+             <cylinderGeometry args={[0.16, 0.16, 0.15, subdivisions]} />
              <meshStandardMaterial color="#eacba0" roughness={0.9} />
           </mesh>
           <mesh position={[0.35, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-             <cylinderGeometry args={[0.16, 0.16, 0.15, 16]} />
+             <cylinderGeometry args={[0.16, 0.16, 0.15, subdivisions]} />
              <meshStandardMaterial color="#eacba0" roughness={0.9} />
           </mesh>
           
           {/* Color bands on the central body */}
           <mesh position={[-0.15, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-             <cylinderGeometry args={[0.132, 0.132, 0.08, 16]} />
+             <cylinderGeometry args={[0.132, 0.132, 0.08, subdivisions]} />
              <meshBasicMaterial color="#b91c1c" />
           </mesh>
           <mesh position={[0.0, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-             <cylinderGeometry args={[0.132, 0.132, 0.08, 16]} />
+             <cylinderGeometry args={[0.132, 0.132, 0.08, subdivisions]} />
              <meshBasicMaterial color="#ca8a04" />
           </mesh>
           <mesh position={[0.15, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-             <cylinderGeometry args={[0.132, 0.132, 0.08, 16]} />
+             <cylinderGeometry args={[0.132, 0.132, 0.08, subdivisions]} />
              <meshBasicMaterial color="#1e3a8a" />
           </mesh>
           <mesh position={[0.35, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
              {/* Gold tolerance band on the right end cap */}
-             <cylinderGeometry args={[0.162, 0.162, 0.05, 16]} />
+             <cylinderGeometry args={[0.162, 0.162, 0.05, subdivisions]} />
              <meshBasicMaterial color="#d4af37" />
           </mesh>
 
@@ -158,26 +173,60 @@ function FloatingComponent({ position, type, index, delay, progressRef, isLogo }
       )}
       {type === 'led' && (
         <group>
-          <mesh position={[0, 0.4, 0]}>
-            <sphereGeometry args={[0.18, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
-            <meshStandardMaterial ref={materialRef1} color={ledColor} emissive={ledEmissive} emissiveIntensity={0.1} transparent opacity={0.9} roughness={0.1} />
+          {/* LED Domed Body */}
+          <mesh position={[0, 0.44, 0]}>
+            <sphereGeometry args={[0.24, subdivisions, subdivisions, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <meshStandardMaterial ref={materialRef1} color={ledColor} emissive={ledEmissive} emissiveIntensity={0.1} transparent opacity={0.9} roughness={0.1} toneMapped={false} />
           </mesh>
-          <mesh position={[0, 0.2, 0]}>
-            <cylinderGeometry args={[0.18, 0.18, 0.4, 16]} />
-            <meshStandardMaterial ref={materialRef2} color={ledColor} emissive={ledEmissive} emissiveIntensity={0.05} transparent opacity={0.8} roughness={0.1} />
+          <mesh position={[0, 0.21, 0]}>
+            <cylinderGeometry args={[0.24, 0.24, 0.46, subdivisions]} />
+            <meshStandardMaterial ref={materialRef2} color={ledColor} emissive={ledEmissive} emissiveIntensity={0.05} transparent opacity={0.8} roughness={0.1} toneMapped={false} />
           </mesh>
-          <mesh position={[0, -0.02, 0]}>
-            <cylinderGeometry args={[0.2, 0.2, 0.05, 16]} />
+          <mesh position={[0, -0.04, 0]}>
+            <cylinderGeometry args={[0.26, 0.26, 0.06, subdivisions]} />
             <meshStandardMaterial color="#9ca3af" roughness={0.4} />
           </mesh>
-          <mesh position={[-0.08, -0.2, 0]}>
-            <cylinderGeometry args={[0.02, 0.02, 0.4]} />
+          {/* Leg leads represent premium connection contacts */}
+          <mesh position={[-0.15, -0.25, 0]}>
+            <cylinderGeometry args={[0.025, 0.025, 0.5]} />
             <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
           </mesh>
-          <mesh position={[0.08, -0.2, 0]}>
-            <cylinderGeometry args={[0.02, 0.02, 0.4]} />
+          <mesh position={[0.15, -0.25, 0]}>
+            <cylinderGeometry args={[0.025, 0.025, 0.5]} />
             <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
           </mesh>
+
+          {/* High-Fidelity soft volumetric glow halo */}
+          {highFidelityMode && (
+            <mesh position={[0, 0.44, 0]}>
+              <sphereGeometry args={[0.48, 12, 12]} />
+              <meshBasicMaterial
+                ref={haloRef}
+                transparent
+                opacity={0.06}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+                color={ledEmissive}
+                toneMapped={false}
+              />
+            </mesh>
+          )}
+
+          {/* Soft bounce light reflection ring on the breadboard surface */}
+          {highFidelityMode && (
+            <mesh position={[0, -0.31, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <circleGeometry args={[0.42, 12]} />
+              <meshBasicMaterial
+                ref={bounceRef}
+                transparent
+                opacity={0.04}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+                color={ledEmissive}
+                toneMapped={false}
+              />
+            </mesh>
+          )}
         </group>
       )}
     </group>
@@ -275,16 +324,84 @@ function Breadboard() {
   );
 }
 
+function getBezierPoint(p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3, t: number) {
+  const p = new THREE.Vector3();
+  const mt = 1 - t;
+  p.x = mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x;
+  p.y = mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y;
+  p.z = mt * mt * p0.z + 2 * mt * t * p1.z + t * t * p2.z;
+  return p;
+}
+
+function PulsingWire({ start, end, mid, color, index, highFidelity }: { start: THREE.Vector3, end: THREE.Vector3, mid: THREE.Vector3, color: string, index: number, highFidelity: boolean }) {
+  const pulseRef1 = useRef<THREE.Mesh>(null);
+  const pulseRef2 = useRef<THREE.Mesh>(null);
+  const lineRef = useRef<any>(null);
+
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+    const speed = 1.0 + (index % 3) * 0.25;
+
+    if (lineRef.current) {
+      // Dynamic breathing current aesthetic
+      lineRef.current.opacity = 0.35 + 0.35 * Math.sin(t * 3.0 + index * 0.8);
+    }
+
+    if (highFidelity) {
+      const p1 = ((t * speed) + (index * 0.12)) % 1.0;
+      const p2 = ((t * speed) + (index * 0.12) + 0.5) % 1.0;
+
+      if (pulseRef1.current) {
+        pulseRef1.current.position.copy(getBezierPoint(start, mid, end, p1));
+      }
+      if (pulseRef2.current) {
+        pulseRef2.current.position.copy(getBezierPoint(start, mid, end, p2));
+      }
+    }
+  });
+
+  return (
+    <group>
+      <QuadraticBezierLine
+        ref={lineRef}
+        start={start}
+        end={end}
+        mid={mid}
+        color={color}
+        lineWidth={1.5}
+        transparent
+        opacity={0.5}
+      />
+      {highFidelity && (
+        <>
+          <mesh ref={pulseRef1}>
+            <sphereGeometry args={[0.07, 6, 6]} />
+            <meshBasicMaterial color={color} toneMapped={false} />
+          </mesh>
+          <mesh ref={pulseRef2}>
+            <sphereGeometry args={[0.05, 4, 4]} />
+            <meshBasicMaterial color={color} toneMapped={false} />
+          </mesh>
+        </>
+      )}
+    </group>
+  );
+}
+
 function BreadboardWires({ logoPoints }: { logoPoints: any[] }) {
+  const highFidelityMode = useAppStore((state) => state.highFidelityMode);
+
   const wires = useMemo(() => {
      const result = [];
      const pts = logoPoints.filter(p => p.isLogo);
      if (pts.length === 0) return result;
      
-     // Generate some fixed wire positions around the breadboard to look like connections
-     for(let i = 0; i < 40; i++) {
+     // Dynamic wire density based on setting
+     const wireCount = highFidelityMode ? 35 : 12;
+     
+     // Generate connection wires
+     for(let i = 0; i < wireCount; i++) {
         const p1 = pts[Math.floor(Math.random() * pts.length)].p;
-        // Make wires go from random points to other random points, or the power rails
         const toRail = Math.random() > 0.5;
         const p2 = toRail ? [p1[0] + (Math.random() - 0.5) * 4, Math.random() > 0.5 ? 2.8 : -2.8] : pts[Math.floor(Math.random() * pts.length)].p;
         
@@ -298,17 +415,17 @@ function BreadboardWires({ logoPoints }: { logoPoints: any[] }) {
         result.push({
            start: new THREE.Vector3(p1[0], 0.16, p1[1]),
            end: new THREE.Vector3(p2[0], 0.16, p2[1]),
-           mid: new THREE.Vector3((p1[0]+p2[0])/2, 0.4 + dist * 0.2, (p1[1]+p2[1])/2),
+           mid: new THREE.Vector3((p1[0]+p2[0])/2, 0.5 + dist * 0.18 + (i * 0.12) % 0.5, (p1[1]+p2[1])/2),
            color
         });
      }
      return result;
-  }, [logoPoints]);
+  }, [logoPoints, highFidelityMode]);
 
   return (
      <group>
         {wires.map((w, i) => (
-            <QuadraticBezierLine key={i} start={w.start} end={w.end} mid={w.mid} color={w.color} lineWidth={2} transparent opacity={0.6} />
+            <PulsingWire key={i} index={i} start={w.start} end={w.end} mid={w.mid} color={w.color} highFidelity={highFidelityMode} />
         ))}
      </group>
   );
@@ -561,6 +678,8 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
     });
   });
 
+  const highFidelityMode = useAppStore((state) => state.highFidelityMode);
+
   return (
     <group ref={containerRef}>
       <group ref={breadboardRef}>
@@ -575,8 +694,8 @@ function GridLogoScene({ progressRef }: { progressRef: React.MutableRefObject<{v
           <FloatingComponent position={[0,0,0]} type={comp.type} index={comp.id} delay={comp.delay} progressRef={progressRef} isLogo={comp.isLogo} />
         </group>
       ))}
-      <Sparkles count={250} scale={35} size={2.5} color="#60a5fa" opacity={0.8} speed={0.5} />
-      <Stars radius={100} depth={50} count={4000} factor={3} saturation={1} fade speed={1.5} />
+      <Sparkles count={highFidelityMode ? 250 : 80} scale={35} size={2.5} color="#60a5fa" opacity={0.8} speed={0.5} />
+      <Stars radius={100} depth={50} count={highFidelityMode ? 4000 : 1200} factor={3} saturation={1} fade speed={1.5} />
     </group>
   );
 }
@@ -618,6 +737,7 @@ function Rig({ progressRef }: { progressRef: React.MutableRefObject<{value: numb
 export default function AntigravityHero() {
   const progressRef = useRef({ value: 0 });
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const highFidelityMode = useAppStore((state) => state.highFidelityMode);
 
   useEffect(() => {
      if (wrapperRef.current) {
@@ -635,10 +755,10 @@ export default function AntigravityHero() {
 
   return (
     <div ref={wrapperRef} className="fixed inset-0 pointer-events-none z-0">
-      <Canvas dpr={[1, 2]}>
+      <Canvas dpr={highFidelityMode ? [1, 2] : 1}>
         <PerspectiveCamera makeDefault position={[0, 12, 22]} fov={45} />
         <ambientLight intensity={0.6} />
-        <spotLight position={[15, 20, 15]} angle={0.3} penumbra={1} intensity={2} color="#ffffff" castShadow />
+        <spotLight position={[15, 20, 15]} angle={0.3} penumbra={1} intensity={2} color="#ffffff" castShadow={highFidelityMode} />
         <pointLight position={[-10, 5, -10]} intensity={1.5} color="#3b82f6" />
         <pointLight position={[10, 5, 10]} intensity={1} color="#fcf0d5" />
         
@@ -648,7 +768,11 @@ export default function AntigravityHero() {
         <Rig progressRef={progressRef} />
         <Environment preset="night" />
         <EffectComposer>
-          <Bloom luminanceThreshold={0.5} mipmapBlur intensity={1.5} />
+          {highFidelityMode ? (
+            <Bloom luminanceThreshold={0.4} mipmapBlur intensity={1.1} radius={0.5} />
+          ) : (
+            <Bloom luminanceThreshold={0.5} intensity={0.5} radius={0.3} />
+          )}
           <Vignette eskil={false} offset={0.1} darkness={0.8} />
         </EffectComposer>
       </Canvas>

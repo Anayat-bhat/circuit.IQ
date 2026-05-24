@@ -3,6 +3,7 @@ import { motion, useScroll, useTransform } from 'motion/react';
 import AntigravityHero from '../components/AntigravityHero';
 import PhysicsWavyRibbon from '../components/PhysicsWavyRibbon';
 import PhysicsShowcase from '../components/PhysicsShowcase';
+import CyberpunkLedMatrix from '../components/CyberpunkLedMatrix';
 import TeamRolesSection from '../components/TeamRolesSection';
 import { useAppStore } from '../store/useAppStore';
 import { Zap, Cpu, MousePointer2, FlaskConical } from 'lucide-react';
@@ -115,6 +116,13 @@ export default function LandingPage() {
                 <PhysicsShowcase />
               </div>
           </div>
+      </section>
+
+      {/* Cyberpunk LED Matrix Showcase Component */}
+      <section className="relative py-20 w-full overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6">
+          <CyberpunkLedMatrix />
+        </div>
       </section>
 
       {/* Team Roles / Founders Showcase */}

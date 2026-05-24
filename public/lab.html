@@ -926,24 +926,86 @@
         }
 
         function buildBoard() {
+            // Main high-precision breadboard body with high-grade sleek off-white resin texture
             const boardGeo = new THREE.BoxGeometry(18, 0.4, 10);
-            const boardMat = new THREE.MeshPhysicalMaterial({ color: 0x111111, roughness: 0.9, metalness: 0.1, clearcoat: 0.1, clearcoatRoughness: 0.8 });
+            const boardMat = new THREE.MeshPhysicalMaterial({ 
+                color: 0xf5f5f5, 
+                roughness: 0.85, 
+                metalness: 0.05, 
+                clearcoat: 0.1, 
+                clearcoatRoughness: 0.9 
+            });
             const board = new THREE.Mesh(boardGeo, boardMat);
-            board.position.set(0, 0.2, 0); board.receiveShadow = true; board.name = 'board'; scene.add(board);
+            board.position.set(0, 0.2, 0); 
+            board.receiveShadow = true; 
+            board.name = 'board'; 
+            scene.add(board);
 
-            const dotGeo = new THREE.CircleGeometry(0.03, 16);
-            const dotMat = new THREE.MeshBasicMaterial({ color: 0xd4af37, transparent: true, opacity: 0.3 });
-            for (let x = -8; x <= 8; x += 1.5) {
-                for (let z = -4; z <= 4; z += 1.5) {
-                    const dot = new THREE.Mesh(dotGeo, dotMat);
-                    dot.rotation.x = -Math.PI / 2; dot.position.set(x, 0.41, z); scene.add(dot);
+            // Integrated Circuit (DIP) central partition divider groove
+            const grooveGeo = new THREE.BoxGeometry(18.05, 0.04, 0.35);
+            const grooveMat = new THREE.MeshBasicMaterial({ color: 0xc4c4c4 });
+            const groove = new THREE.Mesh(grooveGeo, grooveMat);
+            groove.position.set(0, 0.401, 0);
+            scene.add(groove);
+
+            // Red (+) Positive and Blue (-) Negative Power bus graphics
+            const railGeoRed = new THREE.BoxGeometry(17.2, 0.02, 0.06);
+            const railMatRed = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+            const pRail = new THREE.Mesh(railGeoRed, railMatRed);
+            pRail.position.set(0, 0.402, 3.8);
+            scene.add(pRail);
+
+            const railGeoBlue = new THREE.BoxGeometry(17.2, 0.02, 0.06);
+            const railMatBlue = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
+            const nRail = new THREE.Mesh(railGeoBlue, railMatBlue);
+            nRail.position.set(0, 0.402, -3.8);
+            scene.add(nRail);
+
+            // Instanced physical solderless contact sockets
+            const outerGeo = new THREE.CircleGeometry(0.06, 12);
+            const innerGeo = new THREE.CircleGeometry(0.038, 8);
+            const outerMat = new THREE.MeshPhysicalMaterial({ color: 0xc8c8c8, metalness: 0.85, roughness: 0.2 });
+            const innerMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+
+            // Lay out standard rows of contacts with physical InstancedMesh for extreme high performance and image quality (no draw call overhead)
+            const totalHoles = 33 * 14;
+            const instRim = new THREE.InstancedMesh(outerGeo, outerMat, totalHoles);
+            instRim.receiveShadow = true;
+            instRim.name = 'rimInstances';
+            
+            const instInside = new THREE.InstancedMesh(innerGeo, innerMat, totalHoles);
+            instInside.name = 'insideInstances';
+
+            let instIdx = 0;
+            const dummy = new THREE.Object3D();
+            dummy.rotation.x = -Math.PI / 2;
+
+            for (let cx = -8; cx <= 8; cx += 0.5) {
+                for (let cz = -3.5; cz <= 3.5; cz += 0.5) {
+                    if (Math.abs(cz) < 0.2) continue; // Skip the mid divider column entirely
+
+                    dummy.position.set(cx, 0.402, cz);
+                    dummy.updateMatrix();
+                    instRim.setMatrixAt(instIdx, dummy.matrix);
+
+                    dummy.position.set(cx, 0.4025, cz);
+                    dummy.updateMatrix();
+                    instInside.setMatrixAt(instIdx, dummy.matrix);
+
+                    instIdx++;
                 }
             }
+            scene.add(instRim);
+            scene.add(instInside);
 
+            // Beautiful black brushed lab bench workspace surface with reflections
             const floorGeo = new THREE.PlaneGeometry(100, 100);
-            const floorMat = new THREE.MeshStandardMaterial({ color: 0x020202, roughness: 0.1, metalness: 0.8 });
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x070707, roughness: 0.18, metalness: 0.9 });
             const floor = new THREE.Mesh(floorGeo, floorMat);
-            floor.rotation.x = -Math.PI / 2; floor.position.y = -2; floor.receiveShadow = true; scene.add(floor);
+            floor.rotation.x = -Math.PI / 2; 
+            floor.position.y = -2; 
+            floor.receiveShadow = true; 
+            scene.add(floor);
         }
 
         function resize() {
@@ -974,7 +1036,12 @@
     const ComponentModule = (() => {
         const COLORS = { source: 0xd4af37, resistor: 0xcc3333, inductor: 0x3366cc, capacitor: 0x22c55e, ammeter: 0x3b82f6, voltmeter: 0xef4444 };
         const placed = [], SNAP = [];
-        for (let x = -7; x <= 7; x += 2.5) for (let z = -2; z <= 2; z += 2.5) SNAP.push(new THREE.Vector3(x, 0.4, z));
+        // Layout snapping coordinates directly on the breadboard socket matrix
+        for (let x = -7.0; x <= 7.0; x += 1.0) {
+            for (let z of [-2.5, -1.5, 1.5, 2.5]) {
+                SNAP.push(new THREE.Vector3(x, 0.4, z));
+            }
+        }
 
         function createComponent(type, position) {
             const group = new THREE.Group();
@@ -985,7 +1052,7 @@
                 body.castShadow = true; group.add(body);
                 const goldRing = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.2, 32), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 1, roughness: 0.1 }));
                 group.add(goldRing);
-                addTerminalPins(group, 0.7);
+                addTerminalPins(group, 1.0);
             } else if (type === 'resistor') {
                 const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 0.4), new THREE.MeshPhysicalMaterial({ color: 0xdedede, roughness: 0.9 }));
                 body.castShadow = true; group.add(body);
@@ -993,7 +1060,7 @@
                     const band = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.42, 0.42), new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.4 }));
                     band.position.x = x; group.add(band);
                 });
-                addTerminalPins(group, 0.8);
+                addTerminalPins(group, 1.0);
             } else if (type === 'inductor') {
                 const core = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1.4, 32), new THREE.MeshStandardMaterial({ color: 0x111, roughness: 0.9 }));
                 core.rotation.z = Math.PI / 2; group.add(core);
@@ -1001,14 +1068,14 @@
                     const coil = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.08, 16, 32), new THREE.MeshPhysicalMaterial({ color: 0xb87333, metalness: 1.0, roughness: 0.2 }));
                     coil.rotation.y = Math.PI / 2; coil.position.x = -0.6 + i * 0.12; group.add(coil);
                 }
-                addTerminalPins(group, 0.8);
+                addTerminalPins(group, 1.0);
             } else if (type === 'capacitor') {
                 [-0.15, 0.15].forEach(x => {
                     const baseMat = new THREE.MeshPhysicalMaterial({ color, metalness: 0.4, roughness: 0.5, clearcoat: 1.0, clearcoatRoughness: 0.1 });
                     const plate = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.9, 0.8), baseMat);
                     plate.position.x = x; group.add(plate);
                 });
-                addTerminalPins(group, 0.6, 0.3);
+                addTerminalPins(group, 0.5);
             } else if (type === 'ammeter' || type === 'voltmeter') {
                 const body = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.5, 0.7), new THREE.MeshPhysicalMaterial({ color: type === 'ammeter' ? 0x1a2a4a : 0x3a1a1a, metalness: 0.6, roughness: 0.4 }));
                 body.castShadow = true; group.add(body);
@@ -1016,15 +1083,27 @@
                 screen.position.set(0, 0.1, 0.35); group.add(screen);
                 const label = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.02), new THREE.MeshBasicMaterial({ color: type === 'ammeter' ? 0x60a5fa : 0xf87171 }));
                 label.position.set(0, 0.1, 0.37); group.add(label);
-                addTerminalPins(group, 0.6, 0.1);
+                addTerminalPins(group, 0.5);
             }
 
             group.position.copy(position); group.position.y = 0.7;
             const termData = getTerminals(type, group);
 
             termData.forEach((t, i) => {
-                const visNode = new THREE.Mesh(new THREE.SphereGeometry(0.1, 32, 32), new THREE.MeshPhysicalMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 }));
+                // Premium mechanical base collar
+                const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 16), new THREE.MeshStandardMaterial({ color: 0x181818, roughness: 0.5 }));
+                collar.position.copy(t.localPos); collar.position.y -= 0.04; group.add(collar);
+
+                // Polished metallic gold connector cap
+                const visNode = new THREE.Mesh(new THREE.SphereGeometry(0.08, 32, 32), new THREE.MeshPhysicalMaterial({ 
+                    color: 0xd4af37, 
+                    metalness: 0.95, 
+                    roughness: 0.1,
+                    clearcoat: 1.0,
+                    clearcoatRoughness: 0.05
+                }));
                 visNode.position.copy(t.localPos); group.add(visNode); t.mesh = visNode;
+
                 const hitbox = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
                 hitbox.position.copy(t.localPos); hitbox.name = 'terminal';
                 hitbox.userData = { termIndex: i, compIndex: placed.length };
@@ -1055,7 +1134,7 @@
         }
 
         function getTerminals(type, group) {
-            const val = { source: 0.9, resistor: 1.0, inductor: 1.0, capacitor: 0.6, ammeter: 0.7, voltmeter: 0.7 }[type] || 0.8;
+            const val = { source: 1.0, resistor: 1.0, inductor: 1.0, capacitor: 0.5, ammeter: 0.5, voltmeter: 0.5 }[type] || 1.0;
             return [new THREE.Vector3(-val, 0, 0), new THREE.Vector3(val, 0, 0)].map(p => ({
                 localPos: p.clone(), mesh: null,
                 worldPos: () => { const wp = p.clone(); group.localToWorld(wp); return wp; }
@@ -1089,32 +1168,144 @@
     // ================================================================
     const WireModule = (() => {
         const wires = [], particles = [];
-        const WIRE_COLORS = ['#d4af37', '#ef4444', '#3b82f6', '#22c55e', '#f97316', '#a855f7'];
+        const WIRE_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#a855f7', '#6366f1'];
         let wireColorIdx = 0;
 
-        function createWire(from, to) {
+        function createWire(from, to, c1, t1, c2, t2) {
             const color = parseInt(WIRE_COLORS[wireColorIdx % WIRE_COLORS.length].replace('#', ''), 16);
             wireColorIdx++;
 
-            const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5);
-            mid.y += (from.distanceTo(to) * 0.3) + 0.3;
+            const wireGroup = new THREE.Group();
 
-            const curve = new THREE.QuadraticBezierCurve3(from, mid, to);
-            const geo = new THREE.TubeGeometry(curve, 32, 0.05, 16, false);
-            const mat = new THREE.MeshPhysicalMaterial({ color, roughness: 0.6, metalness: 0.1, clearcoat: 0.5 });
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.castShadow = true; SceneModule.getScene().add(mesh);
+            const points = [];
+            const dist = from.distanceTo(to);
+            const idx = wires.length;
 
-            const count = Math.max(6, Math.floor(from.distanceTo(to) * 4));
+            // Unique non-overlapping layer heights for premium arcing
+            const layerHeight = 0.6 + Math.min(2.0, dist * 0.22) + (idx * 0.15) % 0.6;
+
+            // Wire curve routing path
+            points.push(from.clone());
+            points.push(new THREE.Vector3(from.x, from.y + layerHeight * 0.25, from.z));
+            points.push(new THREE.Vector3(from.x, from.y + layerHeight * 0.75, from.z));
+
+            const midX = (from.x + to.x) * 0.5;
+            const midZ = (from.z + to.z) * 0.5;
+            points.push(new THREE.Vector3(midX, Math.max(from.y, to.y) + layerHeight, midZ));
+
+            points.push(new THREE.Vector3(to.x, to.y + layerHeight * 0.75, to.z));
+            points.push(new THREE.Vector3(to.x, to.y + layerHeight * 0.25, to.z));
+            points.push(to.clone());
+
+            const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.5);
+            
+            // Tube Geometry for the insulation sleeve
+            const geo = new THREE.TubeGeometry(curve, 48, 0.042, 16, false);
+            const mat = new THREE.MeshPhysicalMaterial({ 
+                color, 
+                roughness: 0.18, 
+                metalness: 0.1, 
+                clearcoat: 1.0, 
+                clearcoatRoughness: 0.05 
+            });
+
+            const tubeMesh = new THREE.Mesh(geo, mat);
+            tubeMesh.name = 'wire';
+            tubeMesh.castShadow = true; 
+            wireGroup.add(tubeMesh);
+
+            // Detailed end boots and insertion pins
+            const bootGeo = new THREE.CylinderGeometry(0.065, 0.065, 0.18, 16);
+            const bootMat = new THREE.MeshPhysicalMaterial({
+                color,
+                roughness: 0.3,
+                clearcoat: 0.5
+            });
+
+            const pinGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.32, 16);
+            const pinMat = new THREE.MeshStandardMaterial({
+                color: 0xdddddd,
+                metalness: 0.95,
+                roughness: 0.15
+            });
+
+            // Start terminal connectors extending to the breadboard
+            const startBoot = new THREE.Mesh(bootGeo, bootMat);
+            startBoot.position.set(from.x, from.y + 0.09, from.z);
+            wireGroup.add(startBoot);
+
+            const startPin = new THREE.Mesh(pinGeo, pinMat);
+            startPin.position.set(from.x, from.y - 0.16, from.z);
+            wireGroup.add(startPin);
+
+            // End terminal connectors extending to the breadboard
+            const endBoot = new THREE.Mesh(bootGeo, bootMat);
+            endBoot.position.set(to.x, to.y + 0.09, to.z);
+            wireGroup.add(endBoot);
+
+            const endPin = new THREE.Mesh(pinGeo, pinMat);
+            endPin.position.set(to.x, to.y - 0.16, to.z);
+            wireGroup.add(endPin);
+
+            SceneModule.getScene().add(wireGroup);
+
+            // Flowing electrical current simulation particles
+            const count = Math.max(8, Math.floor(from.distanceTo(to) * 5));
             const pArr = [];
             for (let i = 0; i < count; i++) {
-                const p = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 }));
-                p.userData = { t: i / count, speed: 0.003 + Math.random() * 0.002, curve };
+                const p = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.06, 8, 8), 
+                    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 })
+                );
+                p.userData = { t: i / count, speed: 0.0035 + Math.random() * 0.002, curve };
                 p.visible = false;
-                SceneModule.getScene().add(p); pArr.push(p); particles.push(p);
+                SceneModule.getScene().add(p); 
+                pArr.push(p); 
+                particles.push(p);
             }
 
-            wires.push({ mesh, particles: pArr, color });
+            wires.push({ mesh: wireGroup, tubeMesh, particles: pArr, color, connection: { c1, t1, c2, t2 } });
+        }
+
+        function removeWire(mesh) {
+            const idx = wires.findIndex(w => w.mesh === mesh || w.tubeMesh === mesh || w.mesh.children.includes(mesh));
+            if (idx !== -1) {
+                const w = wires[idx];
+                SceneModule.getScene().add(new THREE.Group()); // trigger state update
+                SceneModule.getScene().remove(w.mesh);
+                
+                // Remove energy flow particles from the loop array and render context
+                w.particles.forEach(p => {
+                    SceneModule.getScene().remove(p);
+                    const pIdx = particles.indexOf(p);
+                    if (pIdx !== -1) particles.splice(pIdx, 1);
+                });
+
+                wires.splice(idx, 1);
+                refreshTerminalHighlights();
+
+                AIModule.evaluateState(ComponentModule.getPlaced().map(c => c.type), wires.length, false);
+                document.getElementById('status-wires').textContent = wires.length;
+                showNotification('Wire removed successfully!', 'info');
+            }
+        }
+
+        function refreshTerminalHighlights() {
+            const placed = ComponentModule.getPlaced();
+            // Reset all terminal contacts to non-connected neutral color
+            placed.forEach((comp, cIdx) => {
+                comp.terminals.forEach((term, tIdx) => {
+                    ComponentModule.highlightTerminal(cIdx, tIdx, 0xaaaaaa);
+                });
+            });
+
+            // Restore green glowing indicators for active bridged terminals
+            wires.forEach(w => {
+                if (w.connection) {
+                    ComponentModule.highlightTerminal(w.connection.c1, w.connection.t1, 0x44ff88);
+                    ComponentModule.highlightTerminal(w.connection.c2, w.connection.t2, 0x44ff88);
+                }
+            });
         }
 
         function update(active, intensity = 1.0) {
@@ -1129,13 +1320,15 @@
 
         function setWireColor(colorHex, emissiveHex = 0x000000, intensity = 0) {
             wires.forEach(w => {
-                w.mesh.material.emissive.setHex(emissiveHex);
-                w.mesh.material.emissiveIntensity = intensity;
+                if (w.tubeMesh) {
+                    w.tubeMesh.material.emissive.setHex(emissiveHex);
+                    w.tubeMesh.material.emissiveIntensity = intensity;
+                }
             });
         }
 
         return {
-            createWire, update, setWireColor, getWires: () => wires,
+            createWire, removeWire, update, setWireColor, refreshTerminalHighlights, getWires: () => wires,
             reset: () => {
                 wires.forEach(w => {
                     SceneModule.getScene().remove(w.mesh);
@@ -1512,7 +1705,7 @@
     // ================================================================
     const App = (() => {
         let selected = null, wireMode = false, pWire = null;
-        let orbit = { theta: 0.5, phi: 1.0, radius: 18, target: new THREE.Vector3(0, 0, 0) };
+        let orbit = { theta: 0.5, phi: 1.0, radius: 13.0, target: new THREE.Vector3(0, 0, 0) };
         let currentVals = null;
 
         function init() {
@@ -1706,9 +1899,40 @@
         function setupInteraction() {
             const cvs = document.getElementById('three-canvas');
             let md = false, lp = { x: 0, y: 0 };
+            let hoveredWire = null;
 
             cvs.addEventListener('pointerdown', e => { md = true; lp = { x: e.clientX, y: e.clientY }; });
             cvs.addEventListener('pointermove', e => {
+                // If not dragging, not in wire mode, and not placing a component, check if we hover a wire
+                if (!md && !wireMode && !selected) {
+                    const rc = SceneModule.getRaycaster(e);
+                    const hits = rc.intersectObjects(SceneModule.getScene().children, true).filter(h => h.object.name === 'wire');
+                    if (hits.length) {
+                        cvs.style.cursor = 'pointer';
+                        const wireMesh = hits[0].object;
+                        if (hoveredWire !== wireMesh) {
+                            if (hoveredWire) {
+                                hoveredWire.material.emissive.setHex(hoveredWire.userData.originalEmissive || 0x000000);
+                                hoveredWire.material.emissiveIntensity = hoveredWire.userData.originalIntensity || 0;
+                            }
+                            hoveredWire = wireMesh;
+                            if (wireMesh.userData.originalEmissive === undefined) {
+                                wireMesh.userData.originalEmissive = wireMesh.material.emissive.getHex();
+                                wireMesh.userData.originalIntensity = wireMesh.material.emissiveIntensity;
+                            }
+                            wireMesh.material.emissive.setHex(0xd4af37);
+                            wireMesh.material.emissiveIntensity = 1.0;
+                        }
+                    } else {
+                        cvs.style.cursor = 'default';
+                        if (hoveredWire) {
+                            hoveredWire.material.emissive.setHex(hoveredWire.userData.originalEmissive || 0x000000);
+                            hoveredWire.material.emissiveIntensity = hoveredWire.userData.originalIntensity || 0;
+                            hoveredWire = null;
+                        }
+                    }
+                }
+
                 if (!md || wireMode || selected) return;
                 orbit.theta -= (e.clientX - lp.x) * 0.007;
                 orbit.phi = Math.max(0.15, Math.min(1.4, orbit.phi - (e.clientY - lp.y) * 0.007));
@@ -1734,6 +1958,14 @@
                         AIModule.evaluateState(ComponentModule.getPlaced().map(c => c.type), WireModule.getWires().length, false);
                         document.getElementById('status-comps').textContent = ComponentModule.getPlaced().length;
                         showNotification(\`\${selected.charAt(0).toUpperCase() + selected.slice(1)} placed on board.\`, 'info');
+                    }
+                } else {
+                    // Click to remove wire
+                    const hits = rc.intersectObjects(SceneModule.getScene().children, true).filter(h => h.object.name === 'wire');
+                    if (hits.length) {
+                        WireModule.removeWire(hits[0].object);
+                        hoveredWire = null;
+                        cvs.style.cursor = 'default';
                     }
                 }
             });
@@ -1761,7 +1993,7 @@
                 if (pWire.cIdx !== cIdx) {
                     const p1 = ComponentModule.getPlaced()[pWire.cIdx].terminals[pWire.tIdx].worldPos();
                     const p2 = ComponentModule.getPlaced()[cIdx].terminals[tIdx].worldPos();
-                    WireModule.createWire(p1, p2);
+                    WireModule.createWire(p1, p2, pWire.cIdx, pWire.tIdx, cIdx, tIdx);
                     ComponentModule.highlightTerminal(pWire.cIdx, pWire.tIdx, 0x44ff88);
                     ComponentModule.highlightTerminal(cIdx, tIdx, 0x44ff88);
                     AIModule.evaluateState(ComponentModule.getPlaced().map(c => c.type), WireModule.getWires().length, false);

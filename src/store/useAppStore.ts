@@ -9,6 +9,8 @@ interface LabState {
   setPhysicsBotOpen: (open: boolean) => void;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
+  highFidelityMode: boolean;
+  setHighFidelityMode: (enabled: boolean) => void;
 }
 
 export const useAppStore = create<LabState>((set) => ({
@@ -20,4 +22,6 @@ export const useAppStore = create<LabState>((set) => ({
   setPhysicsBotOpen: (open) => set({ physicsBotOpen: open }),
   theme: 'light',
   toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
+  highFidelityMode: true,
+  setHighFidelityMode: (enabled) => set({ highFidelityMode: enabled }),
 }));
