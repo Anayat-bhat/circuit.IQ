@@ -1972,12 +1972,78 @@
             cvs.addEventListener('dblclick', e => {
                 // Focus on clicked component
                 const rc = SceneModule.getRaycaster(e);
-                const hits = rc.intersectObjects(SceneModule.getScene().children, true).filter(h => h.object.parent && h.object.parent.userData.type);
-                if (hits.length) {
-                    const pos = hits[0].object.parent.position;
-                    orbit.target.set(pos.x, 0, pos.z);
-                    orbit.radius = 10;
-                    updateCam();
+                const hits = rc.intersectObjects(SceneModule.getScene().children, true);
+                
+                // Traverse parent hierarchy to find a root component with userData.type
+                let targetComp = null;
+                for (let hit of hits) {
+                    let curr = hit.object;
+                    while (curr) {
+                        if (curr.userData && curr.userData.type) {
+                            targetComp = curr;
+                            break;
+                        }
+                        curr = curr.parent;
+                    }
+                    if (targetComp) break;
+                }
+
+                const c = SceneModule.getCamera();
+                gsap.killTweensOf(orbit);
+                gsap.killTweensOf(orbit.target);
+                gsap.killTweensOf(c.position);
+
+                if (targetComp) {
+                    const pos = targetComp.position;
+                    const typeName = targetComp.userData.type.toUpperCase();
+                    
+                    // Smoothly pan target to the component and zoom in with a polished angle
+                    gsap.to(orbit, {
+                        radius: 7.5,
+                        phi: 0.95, // sweet-spot visual perspective angle
+                        duration: 1.1,
+                        ease: 'power3.out'
+                    });
+                    
+                    gsap.to(orbit.target, {
+                        x: pos.x,
+                        y: 0,
+                        z: pos.z,
+                        duration: 1.1,
+                        ease: 'power3.out',
+                        onUpdate: () => {
+                            c.position.x = orbit.target.x + orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta);
+                            c.position.y = orbit.target.y + orbit.radius * Math.cos(orbit.phi);
+                            c.position.z = orbit.target.z + orbit.radius * Math.sin(orbit.phi) * Math.cos(orbit.theta);
+                            c.lookAt(orbit.target);
+                        }
+                    });
+                    
+                    showNotification(`Camera focused on ${typeName}`, 'info');
+                } else {
+                    // Reset camera target back to origin to view entire board
+                    gsap.to(orbit, {
+                        radius: 13.0,
+                        phi: 1.0,
+                        duration: 1.1,
+                        ease: 'power3.out'
+                    });
+                    
+                    gsap.to(orbit.target, {
+                        x: 0,
+                        y: 0,
+                        z: 0,
+                        duration: 1.1,
+                        ease: 'power3.out',
+                        onUpdate: () => {
+                            c.position.x = orbit.target.x + orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta);
+                            c.position.y = orbit.target.y + orbit.radius * Math.cos(orbit.phi);
+                            c.position.z = orbit.target.z + orbit.radius * Math.sin(orbit.phi) * Math.cos(orbit.theta);
+                            c.lookAt(orbit.target);
+                        }
+                    });
+                    
+                    showNotification('Camera reset to view board', 'info');
                 }
             });
             cvs.addEventListener('wheel', e => { orbit.radius = Math.max(8, Math.min(30, orbit.radius + e.deltaY * 0.015)); updateCam(); }, { passive: true });

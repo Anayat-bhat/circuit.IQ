@@ -247,13 +247,172 @@ function ShowcaseRow({
 function OhmsLawInteractive() {
   const [voltage, setVoltage] = useState(6); // scale from 1V to 12V
   const [resistance, setResistance] = useState(240); // 50 to 500 ohms
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Calculate Current: I = V / R (represented in milliamperes)
   const currentMa = (voltage / resistance) * 1000;
 
-  // Render electron particles moving along the loop path
-  // Electron speed represents current rate
-  const particleSpeed = Math.max(0.4, (currentMa / 50) * 3);
+  // React-driven high-precision Canvas-based wire particle simulation
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId: number;
+    let width = canvas.width = canvas.offsetWidth || 400;
+    let height = canvas.height = canvas.offsetHeight || 300;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        width = canvas.width = entry.contentRect.width;
+        height = canvas.height = entry.contentRect.height;
+      }
+    });
+    resizeObserver.observe(canvas);
+
+    // Track state: initialize stable particles
+    const maxParticlesCount = 50;
+    const particles = Array.from({ length: maxParticlesCount }, (_, i) => ({
+      progress: i / maxParticlesCount
+    }));
+
+    const animate = () => {
+      ctx.clearRect(0, 0, width, height);
+
+      // Wire track geometries corresponding exactly to SVG track bounds
+      const rx = width * 0.15;
+      const ry = height * 0.20;
+      const rw = width * 0.70;
+      const rh = height * 0.50;
+      const radius = 16;
+
+      if (rw <= 0 || rh <= 0) {
+        animId = requestAnimationFrame(animate);
+        return;
+      }
+
+      const r = Math.min(radius, rw / 2, rh / 2);
+      const lLineX = rw - 2 * r;
+      const lLineY = rh - 2 * r;
+      const lArc = (Math.PI * r) / 2;
+
+      // Linear segment lengths
+      const s1 = lLineX;
+      const s2 = s1 + lArc;
+      const s3 = s2 + lLineY;
+      const s4 = s3 + lArc;
+      const s5 = s4 + lLineX;
+      const s6 = s5 + lArc;
+      const s7 = s6 + lLineY;
+      const s8 = s7 + lArc; // complete track perimeter
+
+      const perimeter = s8;
+
+      // Map progress circular layout parameter [0, 1] to specific coordinates
+      const getPointAlongTrack = (progress: number) => {
+        const d = (progress % 1) * perimeter;
+        if (d <= s1) {
+          const t = d / s1;
+          return { x: rx + r + t * lLineX, y: ry };
+        } else if (d <= s2) {
+          const t = (d - s1) / lArc;
+          const theta = -Math.PI / 2 + t * (Math.PI / 2);
+          return { x: rx + rw - r + r * Math.cos(theta), y: ry + r + r * Math.sin(theta) };
+        } else if (d <= s3) {
+          const t = (d - s2) / lLineY;
+          return { x: rx + rw, y: ry + r + t * lLineY };
+        } else if (d <= s4) {
+          const t = (d - s3) / lArc;
+          const theta = t * (Math.PI / 2);
+          return { x: rx + rw - r + r * Math.cos(theta), y: ry + rh - r + r * Math.sin(theta) };
+        } else if (d <= s5) {
+          const t = (d - s4) / lLineX;
+          return { x: rx + rw - r - t * lLineX, y: ry + rh };
+        } else if (d <= s6) {
+          const t = (d - s5) / lArc;
+          const theta = Math.PI / 2 + t * (Math.PI / 2);
+          return { x: rx + r + r * Math.cos(theta), y: ry + rh - r + r * Math.sin(theta) };
+        } else if (d <= s7) {
+          const t = (d - s6) / lLineY;
+          return { x: rx, y: ry + rh - r - t * lLineY };
+        } else {
+          const t = (d - s7) / lArc;
+          const theta = Math.PI + t * (Math.PI / 2);
+          return { x: rx + r + r * Math.cos(theta), y: ry + r + r * Math.sin(theta) };
+        }
+      };
+
+      // Flow speed scales dynamically: V / R (proportional current)
+      // High potential (V) pushes faster. Low resistance facilitates faster flow.
+      const currentFactor = currentMa; // max value around 240
+      const velocity = Math.max(0.001, (currentFactor / 240) * 0.016 + 0.001);
+
+      // Move particle array clockwise (current conventional flow)
+      particles.forEach((p) => {
+        p.progress = (p.progress + velocity) % 1;
+      });
+
+      // Particle density represents resistance throttling
+      // High resistance limits total flowing electrons, while low resistance opens floodgates
+      // Also scale quantity with active voltage
+      const particlesToDraw = Math.round(5 + (currentFactor / 240) * 35);
+
+      // Draw active particles
+      for (let i = 0; i < particlesToDraw; i++) {
+        const index = Math.floor((i * maxParticlesCount) / particlesToDraw);
+        const p = particles[index];
+        if (!p) continue;
+
+        const pos = getPointAlongTrack(p.progress);
+
+        // Size represents voltage intensity level
+        let particleRadius = 1.3 + (voltage / 12) * 2.5;
+        let glowSize = 4 + (voltage / 12) * 14;
+
+        // Colors change based on intensity: cooling low voltage is pale cyan, shifting to bright yellow/electric blue for higher current loops
+        let glowColor = '#60a5fa'; // Cool blue
+        if (voltage > 9) {
+          glowColor = '#22c55e'; // Blazing energetic electric green
+        } else if (voltage > 5) {
+          glowColor = '#f59e0b'; // Dynamic golden-yellow flux
+        } else if (voltage < 3) {
+          glowColor = '#06b6d4'; // Very light icy cyan
+        }
+
+        // Apply drop shadow glow on canvas
+        ctx.shadowBlur = glowSize;
+        ctx.shadowColor = glowColor;
+        ctx.fillStyle = glowColor;
+
+        // Draw flowing node
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, particleRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // White core multiplier for hot high voltages
+        if (voltage > 7) {
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, particleRadius * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Reset shadows
+      ctx.shadowBlur = 0;
+
+      animId = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      resizeObserver.disconnect();
+    };
+  }, [voltage, resistance, currentMa]);
 
   return (
     <div className="flex-1 flex flex-col h-full pointer-events-auto select-none">
@@ -282,32 +441,13 @@ function OhmsLawInteractive() {
             strokeWidth="3" 
             rx="16" 
           />
-          
-          {/* Real-time flowing electricity track - speed adjusts dynamically with current */}
-          <rect 
-            className="flowing-current-animation"
-            x="15%" 
-            y="20%" 
-            width="70%" 
-            height="50%" 
-            fill="none" 
-            stroke="url(#ohms-grad)" 
-            strokeWidth="4" 
-            rx="16" 
-            strokeDasharray="12 28"
-            style={{
-              animationDuration: `${Math.max(0.3, 3.5 - (currentMa / 20))}s`
-            }}
-          />
-
-          <defs>
-            <linearGradient id="ohms-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#3b82f6" />
-              <stop offset="50%" stopColor="#22c55e" />
-              <stop offset="100%" stopColor="#3b82f6" />
-            </linearGradient>
-          </defs>
         </svg>
+
+        {/* Real-time Custom Flowing Electron Grid Layer */}
+        <canvas 
+          ref={canvasRef} 
+          className="absolute inset-0 w-full h-full pointer-events-none z-0" 
+        />
 
         {/* Components Overlay */}
         
