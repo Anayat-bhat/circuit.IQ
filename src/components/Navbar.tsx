@@ -5,7 +5,7 @@ import { LayoutGrid, FlaskConical, Cpu, Bot, FileText, Info, Zap, Moon, Sun, Men
 import { cn } from '../lib/utils';
 
 export default function Navbar() {
-  const { setLabOpen, isLabOpen, theme, toggleTheme } = useAppStore();
+  const { setLabOpen, isLabOpen, theme, toggleTheme, activeTab, setActiveTab } = useAppStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -16,7 +16,7 @@ export default function Navbar() {
         className="fixed top-0 left-0 right-0 z-[100] h-20 px-4 md:px-6 flex items-center justify-between pointer-events-none"
         style={{ transform: "translateZ(9999px)", transformStyle: "preserve-3d", isolation: "isolate" }}
       >
-        <div className="flex items-center gap-2 pointer-events-auto cursor-pointer" onClick={() => { setLabOpen(false); setMobileMenuOpen(false); }}>
+        <div className="flex items-center gap-2 pointer-events-auto cursor-pointer" onClick={() => { setLabOpen(false); setActiveTab('home'); setMobileMenuOpen(false); }}>
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-neon to-blue-electric flex items-center justify-center shadow-lg shadow-indigo-neon/20">
             <Zap className="text-white w-6 h-6" />
           </div>
@@ -24,11 +24,11 @@ export default function Navbar() {
         </div>
 
         <div className="hidden md:flex items-center gap-6 lg:gap-8 backdrop-blur-md bg-white/70 dark:bg-black/20 border border-slate-200 dark:border-white/10 px-6 lg:px-8 py-3 rounded-full pointer-events-auto transition-colors shadow-sm">
-          <NavLink icon={<LayoutGrid size={18} />} label="Home" active={!isLabOpen} onClick={() => setLabOpen(false)} />
-          <NavLink icon={<FlaskConical size={18} />} label="Experiments" />
+          <NavLink icon={<LayoutGrid size={18} />} label="Home" active={activeTab === 'home' && !isLabOpen} onClick={() => { setActiveTab('home'); setLabOpen(false); }} />
+          <NavLink icon={<FlaskConical size={18} />} label="Experiments" active={false} onClick={() => { setActiveTab('home'); setLabOpen(false); setTimeout(() => { document.getElementById('experiments-section')?.scrollIntoView({ behavior: 'smooth' }); }, 100); }} />
           <NavLink icon={<Cpu size={18} />} label="Virtual Lab" active={isLabOpen} onClick={() => setLabOpen(true)} />
-          <NavLink icon={<Bot size={18} />} label="PhysicsBot" />
-          <NavLink icon={<FileText size={18} />} label="Contact" />
+          <NavLink icon={<Bot size={18} />} label="PhysicsBot" active={false} onClick={() => { setActiveTab('home'); setLabOpen(false); setTimeout(() => { document.getElementById('simulation-section')?.scrollIntoView({ behavior: 'smooth' }); }, 100); }} />
+          <NavLink icon={<FileText size={18} />} label="Contact" active={activeTab === 'contact' && !isLabOpen} onClick={() => { setActiveTab('contact'); setLabOpen(false); }} />
         </div>
 
         <div className="flex items-center gap-2 md:gap-4 pointer-events-auto">
@@ -66,11 +66,11 @@ export default function Navbar() {
             className="fixed inset-0 z-40 bg-white dark:bg-space-black pt-24 px-6 md:hidden pointer-events-auto"
           >
             <div className="flex flex-col gap-4">
-              <MobileNavLink icon={<LayoutGrid size={20} />} label="Home" active={!isLabOpen} onClick={() => { setLabOpen(false); setMobileMenuOpen(false); }} />
-              <MobileNavLink icon={<FlaskConical size={20} />} label="Experiments" onClick={() => setMobileMenuOpen(false)} />
+              <MobileNavLink icon={<LayoutGrid size={20} />} label="Home" active={activeTab === 'home' && !isLabOpen} onClick={() => { setActiveTab('home'); setLabOpen(false); setMobileMenuOpen(false); }} />
+              <MobileNavLink icon={<FlaskConical size={20} />} label="Experiments" onClick={() => { setActiveTab('home'); setLabOpen(false); setMobileMenuOpen(false); setTimeout(() => { document.getElementById('experiments-section')?.scrollIntoView({ behavior: 'smooth' }); }, 150); }} />
               <MobileNavLink icon={<Cpu size={20} />} label="Virtual Lab" active={isLabOpen} onClick={() => { setLabOpen(true); setMobileMenuOpen(false); }} />
-              <MobileNavLink icon={<Bot size={20} />} label="PhysicsBot" onClick={() => setMobileMenuOpen(false)} />
-              <MobileNavLink icon={<FileText size={20} />} label="Contact" onClick={() => setMobileMenuOpen(false)} />
+              <MobileNavLink icon={<Bot size={20} />} label="PhysicsBot" onClick={() => { setActiveTab('home'); setLabOpen(false); setMobileMenuOpen(false); setTimeout(() => { document.getElementById('simulation-section')?.scrollIntoView({ behavior: 'smooth' }); }, 150); }} />
+              <MobileNavLink icon={<FileText size={20} />} label="Contact" active={activeTab === 'contact' && !isLabOpen} onClick={() => { setActiveTab('contact'); setLabOpen(false); setMobileMenuOpen(false); }} />
               
               <div className="mt-8">
                 <button 

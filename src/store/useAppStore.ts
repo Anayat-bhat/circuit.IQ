@@ -11,6 +11,8 @@ interface LabState {
   toggleTheme: () => void;
   highFidelityMode: boolean;
   setHighFidelityMode: (enabled: boolean) => void;
+  activeTab: 'home' | 'contact';
+  setActiveTab: (tab: 'home' | 'contact') => void;
 }
 
 export const useAppStore = create<LabState>((set) => ({
@@ -24,4 +26,6 @@ export const useAppStore = create<LabState>((set) => ({
   toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
   highFidelityMode: true,
   setHighFidelityMode: (enabled) => set({ highFidelityMode: enabled }),
+  activeTab: 'home',
+  setActiveTab: (tab) => set({ activeTab: tab }),
 }));

@@ -7,12 +7,13 @@ import { useEffect } from 'react';
 import { useAppStore } from './store/useAppStore';
 import Navbar from './components/Navbar';
 import LandingPage from './pages/LandingPage';
+import ContactPage from './pages/ContactPage';
 import LabStudio from './pages/LabStudio';
 import { AnimatePresence, motion } from 'motion/react';
 import { cn } from './lib/utils';
 
 export default function App() {
-  const { isLabOpen, theme } = useAppStore();
+  const { isLabOpen, theme, activeTab } = useAppStore();
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -33,13 +34,13 @@ export default function App() {
       <AnimatePresence mode="wait">
         {!isLabOpen ? (
           <motion.div
-            key="landing"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.5 }}
+            key={activeTab}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
           >
-            <LandingPage />
+            {activeTab === 'home' ? <LandingPage /> : <ContactPage />}
           </motion.div>
         ) : (
           <motion.div
