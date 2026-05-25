@@ -14,8 +14,8 @@ function LEDGrid({
   pattern = 'harmonic',
   speed = 1.2,
   glowStrength = 24,
-  coreColor = '#F5FF6B',
-  glowColor = '#D4FF00',
+  coreColor = '#EBF8FF',
+  glowColor = '#0052FF',
   hoveredId = null,
   setHoveredId
 }: {
@@ -382,18 +382,37 @@ function CameraRig() {
   const { camera } = useThree();
   useFrame((state) => {
     // Gentle floating camera effect
-    const t = state.clock.getElapsedTime();
     camera.lookAt(0, -0.2, 0);
   });
   return null;
 }
 
+// A performant FPS monitor helper inside the R3F Canvas
+function FPSMonitor({ onFpsUpdate }: { onFpsUpdate: (fps: number) => void }) {
+  const lastTime = useRef(performance.now());
+  const frames = useRef(0);
+
+  useFrame(() => {
+    frames.current++;
+    const now = performance.now();
+    if (now >= lastTime.current + 1000) {
+      const fpsVal = Math.round((frames.current * 1000) / (now - lastTime.current));
+      onFpsUpdate(fpsVal);
+      frames.current = 0;
+      lastTime.current = now;
+    }
+  });
+
+  return null;
+}
+
 export default function CyberpunkLedMatrix() {
+  const [fps, setFps] = useState<number | null>(null);
   const [pattern, setPattern] = useState<'harmonic' | 'wave' | 'circular' | 'cyber-pulse' | 'matrix'>('harmonic');
   const [speed, setSpeed] = useState<number>(1.2);
   const [glowStrength, setGlowStrength] = useState<number>(24);
-  const [coreColor, setCoreColor] = useState<string>('#F5FF6B');
-  const [glowColor, setGlowColor] = useState<string>('#D4FF00');
+  const [coreColor, setCoreColor] = useState<string>('#EBF8FF');
+  const [glowColor, setGlowColor] = useState<string>('#0052FF');
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -427,13 +446,13 @@ export default function CyberpunkLedMatrix() {
     <div className="w-full flex flex-col xl:flex-row gap-6 bg-slate-950/85 p-6 md:p-8 rounded-3xl border border-white/5 backdrop-blur-3xl shadow-[0_24px_70px_rgba(0,0,0,0.8)] relative overflow-hidden transition-all duration-300">
       
       {/* Cyber Background Accents */}
-      <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/5 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-yellow-500/5 blur-[120px] rounded-full pointer-events-none" />
-
+      <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-80 h-80 bg-cyan-500/5 blur-[120px] rounded-full pointer-events-none" />
+ 
       {/* Interactive Controls Column (Left) */}
       <div className="w-full xl:w-80 flex flex-col gap-5 z-10 relative">
         <div className="flex flex-col gap-1.5 text-left">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-emerald-500/15 bg-emerald-500/5 text-emerald-400 text-[10px] font-mono tracking-wider w-max">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-blue-500/15 bg-blue-500/5 text-blue-400 text-[10px] font-mono tracking-wider w-max">
             <Cpu className="w-3.5 h-3.5" />
             <span>Interactive Simulator</span>
           </div>
@@ -442,14 +461,14 @@ export default function CyberpunkLedMatrix() {
             Realistic virtual PCB board prototype rendering hundreds of glowing fluorescent dome LEDs on a translucent frosted acrylic chassis.
           </p>
         </div>
-
+ 
         {/* Live Controller Sliders */}
         <div className="flex flex-col gap-4.5 bg-black/40 p-5 rounded-2xl border border-white/5">
           <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-            <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+            <Sliders className="w-3.5 h-3.5 text-blue-400" />
             <span>Parameters</span>
           </div>
-
+ 
           {/* Pattern Selection */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[10px] text-gray-500 font-mono uppercase text-left">Wave Pattern</label>
@@ -460,22 +479,22 @@ export default function CyberpunkLedMatrix() {
                   onClick={() => setPattern(p.id)}
                   className={`px-3 py-2 text-[10px] font-medium rounded-lg text-left transition-all duration-200 flex items-center justify-between border ${
                     pattern === p.id
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                       : 'bg-white/5 text-gray-400 border-transparent hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   <span className="truncate">{p.label}</span>
-                  {pattern === p.id && <CircleDot className="w-2.5 h-2.5 text-emerald-400 animate-pulse shrink-0 ml-1" />}
+                  {pattern === p.id && <CircleDot className="w-2.5 h-2.5 text-blue-400 animate-pulse shrink-0 ml-1" />}
                 </button>
               ))}
             </div>
           </div>
-
+ 
           {/* Speed */}
           <div className="flex flex-col gap-1.5 mt-1">
             <div className="flex justify-between items-center text-[10px] font-mono text-gray-500 uppercase">
               <span>Oscillation Speed</span>
-              <span className="text-emerald-400 font-mono">{(speed).toFixed(1)}Hz</span>
+              <span className="text-blue-400 font-mono">{(speed).toFixed(1)}Hz</span>
             </div>
             <input
               type="range"
@@ -484,15 +503,15 @@ export default function CyberpunkLedMatrix() {
               step="0.1"
               value={speed}
               onChange={(e) => setSpeed(parseFloat(e.target.value))}
-              className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-400"
+              className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-400"
             />
           </div>
-
+ 
           {/* Bloom Emission Strength */}
           <div className="flex flex-col gap-1.5 mt-1">
             <div className="flex justify-between items-center text-[10px] font-mono text-gray-500 uppercase">
               <span>Emission Strength</span>
-              <span className="text-emerald-400 font-mono">{glowStrength}</span>
+              <span className="text-blue-400 font-mono">{glowStrength}</span>
             </div>
             <input
               type="range"
@@ -501,18 +520,19 @@ export default function CyberpunkLedMatrix() {
               step="1"
               value={glowStrength}
               onChange={(e) => setGlowStrength(parseInt(e.target.value))}
-              className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-400"
+              className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-400"
             />
           </div>
-
+ 
           {/* Color Core preset selector */}
           <div className="flex flex-col gap-2 mt-1">
             <label className="text-[10px] text-gray-500 font-mono uppercase text-left">LED Colors</label>
             <div className="flex gap-2.5">
               {[
-                { name: 'Lime Core', core: '#F5FF6B', glow: '#D4FF00' },
+                { name: 'Cyber Blue', core: '#EBF8FF', glow: '#0052FF' },
+                { name: 'Ice Cyan', core: '#E0FFFF', glow: '#00D2FF' },
                 { name: 'Aurora Green', core: '#FFFFFF', glow: '#10b981' },
-                { name: 'Neon Slime', core: '#E6FFAA', glow: '#22c55e' },
+                { name: 'Deep Violet', core: '#FDF2FF', glow: '#9333ea' },
                 { name: 'Cyberpunk Red', core: '#FFEAEA', glow: '#ef4444' }
               ].map((c) => (
                 <button
@@ -534,25 +554,49 @@ export default function CyberpunkLedMatrix() {
           </div>
         </div>
       </div>
-
+ 
       {/* Professional 3D Intersective Rendering View Canvas (Right) */}
       <div 
-        ref={containerRef}
+         ref={containerRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoveredId(null)}
         className="flex-1 h-[450px] md:h-[550px] bg-slate-900/40 rounded-2xl relative border border-white/5 overflow-hidden group/canvas"
       >
         <div className="absolute top-4 left-4 z-10 flex gap-2">
           <div className="bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/5 text-[9px] font-mono text-gray-400 flex items-center gap-1.5 uppercase">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
             <span>Interactive Simulator Grid</span>
+          </div>
+        </div>
+
+        {/* Dynamic Non-Intrusive Performance FPS Monitor */}
+        <div className="absolute top-4 right-4 z-10 flex gap-2">
+          <div className="bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/5 text-[9px] font-mono text-gray-400 flex items-center gap-2 uppercase">
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              fps === null
+                ? 'bg-gray-400 animate-pulse'
+                : fps >= 55
+                ? 'bg-emerald-400 drop-shadow-[0_0_4px_rgba(52,211,153,0.5)]'
+                : fps >= 30
+                ? 'bg-yellow-400 animate-pulse'
+                : 'bg-red-500 animate-ping'
+            }`} />
+            <span>FPS: <strong className={
+              fps === null
+                ? 'text-gray-400'
+                : fps >= 55
+                ? 'text-emerald-400'
+                : fps >= 30
+                ? 'text-yellow-400'
+                : 'text-red-400'
+            }>{fps !== null ? fps : '--'}</strong></span>
           </div>
         </div>
 
         {/* Floating Tooltip displaying exact physical LED details */}
         {hoveredId !== null && tooltipPos !== null && (
           <div
-            className="absolute z-20 pointer-events-none bg-slate-950/95 border border-emerald-500/30 rounded-xl px-4 py-3 text-xs text-white font-mono shadow-[0_0_20px_rgba(212,255,0,0.15)] backdrop-blur-md flex flex-col gap-1.2 transition-all duration-75 text-left"
+            className="absolute z-20 pointer-events-none bg-slate-950/95 border border-blue-500/30 rounded-xl px-4 py-3 text-xs text-white font-mono shadow-[0_0_20px_rgba(0,136,255,0.15)] backdrop-blur-md flex flex-col gap-1.2 transition-all duration-75 text-left"
             style={{
               left: Math.max(10, Math.min(tooltipPos.x + 18, (containerRef.current?.clientWidth || 0) - 195)),
               top: Math.max(10, Math.min(tooltipPos.y - 125, (containerRef.current?.clientHeight || 0) - 135)),
@@ -569,10 +613,10 @@ export default function CyberpunkLedMatrix() {
               <span className="text-white font-semibold">Row {Math.floor(hoveredId / cols) + 1}, Col {(hoveredId % cols) + 1}</span>
               
               <span className="text-gray-500">X pos:</span>
-              <span className="text-emerald-300 font-semibold">{((hoveredId % cols - cols / 2) * 1.2).toFixed(2)} cm</span>
+              <span className="text-cyan-300 font-semibold">{((hoveredId % cols - cols / 2) * 1.2).toFixed(2)} cm</span>
               
               <span className="text-gray-500">Z pos:</span>
-              <span className="text-emerald-300 font-semibold">{((Math.floor(hoveredId / cols) - rows / 2) * 1.2).toFixed(2)} cm</span>
+              <span className="text-cyan-300 font-semibold">{((Math.floor(hoveredId / cols) - rows / 2) * 1.2).toFixed(2)} cm</span>
             </div>
           </div>
         )}
@@ -602,7 +646,7 @@ export default function CyberpunkLedMatrix() {
             <mesh castShadow receiveShadow>
               <boxGeometry args={[boardWidth, 0.08, boardHeight]} />
               <meshPhysicalMaterial
-                color="#1b2e24"
+                color="#0e1b30"
                 roughness={0.2}
                 metalness={0.15}
                 transmission={0.85}
@@ -659,6 +703,7 @@ export default function CyberpunkLedMatrix() {
           </EffectComposer>
 
           <CameraRig />
+          <FPSMonitor onFpsUpdate={setFps} />
         </Canvas>
       </div>
     </div>
