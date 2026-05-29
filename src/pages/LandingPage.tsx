@@ -101,7 +101,7 @@ export default function LandingPage() {
       </section>
 
       {/* Experiments Explorer Section with Wavy Ribbon stretching 100% full screen width */}
-      <section className="relative py-32 w-full overflow-hidden">
+      <section id="experiments-section" className="relative py-32 w-full overflow-hidden">
           <div className="w-full mb-16">
               <PhysicsWavyRibbon />
           </div>

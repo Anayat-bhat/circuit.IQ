@@ -16,6 +16,7 @@ import {
   TrendingUp,
   LineChart
 } from 'lucide-react';
+import InteractiveBreadboard from './InteractiveBreadboard';
 
 export default function PhysicsShowcase() {
   return (
@@ -70,6 +71,11 @@ export default function PhysicsShowcase() {
         interactiveElement={<KvlKclRcInteractive />}
         reverse={false}
       />
+
+      {/* Row 4: Live Interactive Breadboard Workspace */}
+      <div className="pt-12">
+        <InteractiveBreadboard />
+      </div>
     </div>
   );
 }
