@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, 
@@ -40,6 +40,222 @@ interface GraphNode {
 }
 
 export default function InteractiveBreadboard() {
+  // Web Audio Context & Sound engine
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const isInitialMount = useRef(true);
+  const prevStatusRef = useRef<'idle' | 'closed' | 'short' | 'high-res' | null>('idle');
+
+  const getAudioCtx = () => {
+    if (!audioCtxRef.current) {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtxRef.current = new AudioContextClass();
+      }
+    }
+    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
+    return audioCtxRef.current;
+  };
+
+  const playAnchorSound = () => {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(440, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.08);
+    
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.1);
+  };
+
+  const playPlaceSound = (type: string) => {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    
+    if (type === 'wire') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, now); // C5
+      osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.15); // G5
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(now + 0.16);
+    } else if (type === 'led') {
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(659.25, now); // E5
+      osc1.frequency.exponentialRampToValueAtTime(1046.50, now + 0.25); // C5
+      
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(1318.51, now); // E6
+      
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+      osc1.start();
+      osc2.start();
+      osc1.stop(now + 0.26);
+      osc2.stop(now + 0.26);
+    } else if (type === 'resistor') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(329.63, now); // E4
+      osc.frequency.linearRampToValueAtTime(220, now + 0.1); // A3
+      
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(now + 0.13);
+    } else if (type === 'capacitor') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.exponentialRampToValueAtTime(440, now + 0.12);
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(now + 0.13);
+    }
+  };
+
+  const playEraseSound = () => {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(330, now);
+    osc.frequency.exponentialRampToValueAtTime(110, now + 0.15);
+    
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, now);
+    
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.start();
+    osc.stop(now + 0.16);
+  };
+
+  const playShortCircuitSound = () => {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(110, now);
+    osc1.frequency.linearRampToValueAtTime(120, now + 0.1);
+    osc1.frequency.linearRampToValueAtTime(90, now + 0.2);
+    osc1.frequency.linearRampToValueAtTime(110, now + 0.3);
+    
+    osc2.type = 'square';
+    osc2.frequency.setValueAtTime(55, now);
+    
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(400, now);
+    
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.setValueAtTime(0.15, now + 0.05);
+    gain.gain.setValueAtTime(0, now + 0.08);
+    gain.gain.setValueAtTime(0.15, now + 0.12);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    
+    osc1.connect(filter);
+    osc2.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc1.start();
+    osc2.start();
+    osc1.stop(now + 0.31);
+    osc2.stop(now + 0.31);
+  };
+
+  const playStableCircuitSound = () => {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    
+    const notes = [523.25, 659.25, 783.99];
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+      
+      gain.gain.setValueAtTime(0.0, now);
+      gain.gain.setValueAtTime(0.08, now + idx * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.25);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + idx * 0.08);
+      osc.stop(now + idx * 0.08 + 0.26);
+    });
+  };
+
+  const playUnstableCircuitSound = () => {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    
+    const freq = 698.46; // F5 warning beep
+    [0, 0.12].forEach((delay) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + delay);
+      
+      gain.gain.setValueAtTime(0.08, now + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.08);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + delay);
+      osc.stop(now + delay + 0.09);
+    });
+  };
+
   const [selectedTool, setSelectedTool] = useState<'led' | 'resistor' | 'wire' | 'capacitor' | 'select' | 'eraser'>('led');
   const [ledColor, setLedColor] = useState<string>('red');
   const [resistorValue, setResistorValue] = useState<string>('220Ω');
@@ -75,10 +291,6 @@ export default function InteractiveBreadboard() {
   const [pendingFrom, setPendingFrom] = useState<SocketCoords | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [showHelp, setShowHelp] = useState(false);
-  const [circuitStatus, setCircuitStatus] = useState<{
-    code: 'idle' | 'closed' | 'short' | 'high-res';
-    msg: string;
-  }>({ code: 'idle', msg: 'Breadboard ready. Connect elements to form a complete circuit!' });
 
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -119,9 +331,9 @@ export default function InteractiveBreadboard() {
     return `col_${coords.col}`;
   };
 
-  // Live trace the electrical paths when components or power state changes
-  useEffect(() => {
-    // 1. Build adjacency graph of nodes: '+', '-', 'col_0'..'col_21'
+  // 1. Memoize circuit calculations to avoid modifying state during calculation
+  const { litCompIds, activePathComps, circuitStatus } = useMemo(() => {
+    // Build adjacency graph of nodes: '+', '-', 'col_0'..'col_21'
     const graph: { [id: string]: GraphNode } = {
       '+': { id: '+', neighbors: [] },
       '-': { id: '-', neighbors: [] }
@@ -140,7 +352,7 @@ export default function InteractiveBreadboard() {
       }
     });
 
-    // 2. Run graph search (BFS) starting from Positive Rail '+' to see what paths reach Negative Rail '-'
+    // Run graph search (BFS) starting from Positive Rail '+' to see what paths reach Negative Rail '-'
     const visited = new Set<string>();
     const queue: string[] = ['+'];
     visited.add('+');
@@ -149,7 +361,6 @@ export default function InteractiveBreadboard() {
     const pathEdges: { [nodeId: string]: PlacedComponent } = {};
 
     let pathFound = false;
-    let pathNodesList: string[] = [];
 
     while (queue.length > 0) {
       const curr = queue.shift()!;
@@ -188,50 +399,62 @@ export default function InteractiveBreadboard() {
       }
     }
 
-    // Update status indicators
+    // Determine status indicators
+    let code: 'idle' | 'closed' | 'short' | 'high-res' = 'idle';
+    let msg = 'No power loop detected. Click on tools and connect pins to bridge the top Positive (+) and Negative (-) rails!';
+
     if (pathFound) {
-      // Analyze types in the active path
       const hasLED = activePathComps.some(c => c.type === 'led');
       const hasResistor = activePathComps.some(c => c.type === 'resistor');
       const onlyWiresObj = activePathComps.every(c => c.type === 'wire');
 
       if (onlyWiresObj) {
-        setCircuitStatus({
-          code: 'short',
-          msg: '💥 SHORT-CIRCUIT DETECTED! Unrestricted direct loop between (+) and (-) can damage your gear. Add an LED or Resistor to add impedance!'
-        });
+        code = 'short';
+        msg = '💥 SHORT-CIRCUIT DETECTED! Unrestricted direct loop between (+) and (-) can damage your gear. Add an LED or Resistor to add impedance!';
       } else if (hasLED && !hasResistor) {
-        setCircuitStatus({
-          code: 'closed',
-          msg: '💡 WARNING: Lit up LED directly without a current-limiting resistor! In a real lab, this LED would burn out from overcurrent!'
-        });
+        code = 'closed';
+        msg = '💡 WARNING: Lit up LED directly without a current-limiting resistor! In a real lab, this LED would burn out from overcurrent!';
       } else if (hasLED && hasResistor) {
-        setCircuitStatus({
-          code: 'closed',
-          msg: '🌟 STABLE CLOSED CIRCUIT! Resistor restricts optimal current, feeding bright, safe illumination to your LED layout.'
-        });
+        code = 'closed';
+        msg = '🌟 STABLE CLOSED CIRCUIT! Resistor restricts optimal current, feeding bright, safe illumination to your LED layout.';
       } else {
-        setCircuitStatus({
-          code: 'closed',
-          msg: '⚡ ACTIVE CURRENT LOOP! Path is closed and electricity is flowing freely through passive components.'
-        });
+        code = 'closed';
+        msg = '⚡ ACTIVE CURRENT LOOP! Path is closed and electricity is flowing freely through passive components.';
       }
-    } else {
-      setCircuitStatus({
-        code: 'idle',
-        msg: 'No power loop detected. Click on tools and connect pins to bridge the top Positive (+) and Negative (-) rails!'
-      });
     }
 
-    // Set lit state on each component
-    setPlacedComponents((prev) =>
-      prev.map((comp) => ({
-        ...comp,
-        lit: litCompIds.has(comp.id)
-      }))
-    );
-
+    return {
+      litCompIds,
+      activePathComps,
+      circuitStatus: { code, msg }
+    };
   }, [placedComponents]);
+
+  // 2. Play warning, success or error feedback sound when circuit status changes
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      prevStatusRef.current = circuitStatus.code;
+      return;
+    }
+
+    if (circuitStatus.code !== prevStatusRef.current) {
+      if (circuitStatus.code === 'short') {
+        playShortCircuitSound();
+      } else if (circuitStatus.code === 'closed') {
+        const hasLED = activePathComps.some(c => c.type === 'led');
+        const hasResistor = activePathComps.some(c => c.type === 'resistor');
+        if (hasLED && hasResistor) {
+          playStableCircuitSound();
+        } else if (hasLED && !hasResistor) {
+          playUnstableCircuitSound();
+        } else {
+          playStableCircuitSound();
+        }
+      }
+    }
+    prevStatusRef.current = circuitStatus.code;
+  }, [circuitStatus.code, activePathComps]);
 
   // Handle click on any socket hole
   const handleSocketClick = (coords: SocketCoords) => {
@@ -242,6 +465,7 @@ export default function InteractiveBreadboard() {
     if (!pendingFrom) {
       // First point selected
       setPendingFrom(coords);
+      playAnchorSound();
     } else {
       // Prevent placing on the same socket
       if (isSameSocket(pendingFrom, coords)) {
@@ -262,6 +486,7 @@ export default function InteractiveBreadboard() {
       };
 
       setPlacedComponents((prev) => [...prev, newComp]);
+      playPlaceSound(selectedTool);
       setPendingFrom(null);
     }
   };
@@ -290,12 +515,14 @@ export default function InteractiveBreadboard() {
   // Erase component
   const eraseComponent = (id: string) => {
     setPlacedComponents((prev) => prev.filter((comp) => comp.id !== id));
+    playEraseSound();
   };
 
   // Reset Board completely
   const clearBoard = () => {
     setPlacedComponents([]);
     setPendingFrom(null);
+    playEraseSound();
   };
 
   // Load a demo circuit
@@ -327,6 +554,7 @@ export default function InteractiveBreadboard() {
       }
     ]);
     setPendingFrom(null);
+    playStableCircuitSound();
   };
 
   // Render Resistor Bands based on value
@@ -730,7 +958,7 @@ export default function InteractiveBreadboard() {
                     />
 
                     {/* Flowing animated grid current dots if lit */}
-                    {comp.lit && (
+                    {litCompIds.has(comp.id) && (
                       <path
                         d={`M ${x1} ${y1} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${x2} ${y2}`}
                         fill="none"
@@ -771,7 +999,7 @@ export default function InteractiveBreadboard() {
                     <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
                     
                     {/* Live metal glow indicator if loop closed */}
-                    {comp.lit && (
+                    {litCompIds.has(comp.id) && (
                       <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#f59e0b" strokeWidth="3" className="opacity-25" />
                     )}
 
@@ -834,7 +1062,7 @@ export default function InteractiveBreadboard() {
                     />
 
                     {/* Bright radiating light circle back glow if operating */}
-                    {comp.lit && (
+                    {litCompIds.has(comp.id) && (
                       <circle
                         cx={midX}
                         cy={midY}
@@ -850,7 +1078,7 @@ export default function InteractiveBreadboard() {
                       cy={midY}
                       r="6.5"
                       fill={ledColorHex}
-                      opacity={comp.lit ? 0.95 : 0.65}
+                      opacity={litCompIds.has(comp.id) ? 0.95 : 0.65}
                       stroke="#ffffff"
                       strokeWidth="0.8"
                       className="transition-opacity"
@@ -862,7 +1090,7 @@ export default function InteractiveBreadboard() {
                       cy={midY - 2}
                       r="2"
                       fill="#ffffff"
-                      opacity={comp.lit ? 1 : 0.4}
+                      opacity={litCompIds.has(comp.id) ? 1 : 0.4}
                     />
 
                     {/* Hover erase visualizer */}
@@ -943,7 +1171,7 @@ export default function InteractiveBreadboard() {
           <div className="flex justify-between text-[10px] font-mono mt-1 text-slate-500 dark:text-slate-400 border-t border-slate-200/50 dark:border-white/5 pt-1">
             <span>Grid resistance:</span>
             <span className="font-bold text-slate-700 dark:text-slate-300">
-              {placedComponents.some(c => c.type === 'resistor' && c.lit) ? 'Balanced' : '0.1 Ω'}
+              {placedComponents.some(c => c.type === 'resistor' && litCompIds.has(c.id)) ? 'Balanced' : '0.1 Ω'}
             </span>
           </div>
         </div>
