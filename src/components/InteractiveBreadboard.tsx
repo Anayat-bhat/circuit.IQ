@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, 
@@ -75,10 +75,6 @@ export default function InteractiveBreadboard() {
   const [pendingFrom, setPendingFrom] = useState<SocketCoords | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [showHelp, setShowHelp] = useState(false);
-  const [circuitStatus, setCircuitStatus] = useState<{
-    code: 'idle' | 'closed' | 'short' | 'high-res';
-    msg: string;
-  }>({ code: 'idle', msg: 'Breadboard ready. Connect elements to form a complete circuit!' });
 
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -120,7 +116,7 @@ export default function InteractiveBreadboard() {
   };
 
   // Live trace the electrical paths when components or power state changes
-  useEffect(() => {
+  const { litCompIds, circuitStatus } = useMemo(() => {
     // 1. Build adjacency graph of nodes: '+', '-', 'col_0'..'col_21'
     const graph: { [id: string]: GraphNode } = {
       '+': { id: '+', neighbors: [] },
@@ -149,7 +145,6 @@ export default function InteractiveBreadboard() {
     const pathEdges: { [nodeId: string]: PlacedComponent } = {};
 
     let pathFound = false;
-    let pathNodesList: string[] = [];
 
     while (queue.length > 0) {
       const curr = queue.shift()!;
@@ -188,7 +183,8 @@ export default function InteractiveBreadboard() {
       }
     }
 
-    // Update status indicators
+    // Determine circuitStatus
+    let status: { code: 'idle' | 'closed' | 'short' | 'high-res'; msg: string };
     if (pathFound) {
       // Analyze types in the active path
       const hasLED = activePathComps.some(c => c.type === 'led');
@@ -196,41 +192,34 @@ export default function InteractiveBreadboard() {
       const onlyWiresObj = activePathComps.every(c => c.type === 'wire');
 
       if (onlyWiresObj) {
-        setCircuitStatus({
+        status = {
           code: 'short',
           msg: '💥 SHORT-CIRCUIT DETECTED! Unrestricted direct loop between (+) and (-) can damage your gear. Add an LED or Resistor to add impedance!'
-        });
+        };
       } else if (hasLED && !hasResistor) {
-        setCircuitStatus({
+        status = {
           code: 'closed',
           msg: '💡 WARNING: Lit up LED directly without a current-limiting resistor! In a real lab, this LED would burn out from overcurrent!'
-        });
+        };
       } else if (hasLED && hasResistor) {
-        setCircuitStatus({
+        status = {
           code: 'closed',
           msg: '🌟 STABLE CLOSED CIRCUIT! Resistor restricts optimal current, feeding bright, safe illumination to your LED layout.'
-        });
+        };
       } else {
-        setCircuitStatus({
+        status = {
           code: 'closed',
           msg: '⚡ ACTIVE CURRENT LOOP! Path is closed and electricity is flowing freely through passive components.'
-        });
+        };
       }
     } else {
-      setCircuitStatus({
+      status = {
         code: 'idle',
         msg: 'No power loop detected. Click on tools and connect pins to bridge the top Positive (+) and Negative (-) rails!'
-      });
+      };
     }
 
-    // Set lit state on each component
-    setPlacedComponents((prev) =>
-      prev.map((comp) => ({
-        ...comp,
-        lit: litCompIds.has(comp.id)
-      }))
-    );
-
+    return { litCompIds, circuitStatus: status };
   }, [placedComponents]);
 
   // Handle click on any socket hole
@@ -664,6 +653,7 @@ export default function InteractiveBreadboard() {
 
             {/* Render Placed Components with high-precision aesthetic graphics */}
             {placedComponents.map((comp) => {
+              const isLit = litCompIds.has(comp.id);
               const x1 = getX(comp.from.col);
               const y1 = getY(comp.from.type, comp.from.row);
               const x2 = getX(comp.to.col);
@@ -730,7 +720,7 @@ export default function InteractiveBreadboard() {
                     />
 
                     {/* Flowing animated grid current dots if lit */}
-                    {comp.lit && (
+                    {isLit && (
                       <path
                         d={`M ${x1} ${y1} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${x2} ${y2}`}
                         fill="none"
@@ -771,7 +761,7 @@ export default function InteractiveBreadboard() {
                     <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
                     
                     {/* Live metal glow indicator if loop closed */}
-                    {comp.lit && (
+                    {isLit && (
                       <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#f59e0b" strokeWidth="3" className="opacity-25" />
                     )}
 
@@ -834,7 +824,7 @@ export default function InteractiveBreadboard() {
                     />
 
                     {/* Bright radiating light circle back glow if operating */}
-                    {comp.lit && (
+                    {isLit && (
                       <circle
                         cx={midX}
                         cy={midY}
@@ -850,7 +840,7 @@ export default function InteractiveBreadboard() {
                       cy={midY}
                       r="6.5"
                       fill={ledColorHex}
-                      opacity={comp.lit ? 0.95 : 0.65}
+                      opacity={isLit ? 0.95 : 0.65}
                       stroke="#ffffff"
                       strokeWidth="0.8"
                       className="transition-opacity"
@@ -862,7 +852,7 @@ export default function InteractiveBreadboard() {
                       cy={midY - 2}
                       r="2"
                       fill="#ffffff"
-                      opacity={comp.lit ? 1 : 0.4}
+                      opacity={isLit ? 1 : 0.4}
                     />
 
                     {/* Hover erase visualizer */}
@@ -943,7 +933,7 @@ export default function InteractiveBreadboard() {
           <div className="flex justify-between text-[10px] font-mono mt-1 text-slate-500 dark:text-slate-400 border-t border-slate-200/50 dark:border-white/5 pt-1">
             <span>Grid resistance:</span>
             <span className="font-bold text-slate-700 dark:text-slate-300">
-              {placedComponents.some(c => c.type === 'resistor' && c.lit) ? 'Balanced' : '0.1 Ω'}
+              {placedComponents.some(c => c.type === 'resistor' && litCompIds.has(c.id)) ? 'Balanced' : '0.1 Ω'}
             </span>
           </div>
         </div>
